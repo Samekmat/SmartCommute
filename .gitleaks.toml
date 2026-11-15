@@ -1,0 +1,26 @@
+# ==============================================================================
+# Gitleaks Configuration for SmartCommute
+# Secret detection rules and synthetic fixture allowlists
+# ==============================================================================
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic test fixtures, dummy tokens, and documentation references"
+regexes = [
+  '''(?i)sk-test-mock-key''',
+  '''(?i)AIzaSyMockKey''',
+  '''(?i)AIzaSyTestKey123''',
+  '''(?i)sk-ant-mock''',
+]
+paths = [
+  '''(^|/)tests/''',
+  '''(^|/)__tests__/''',
+  '''(^|/)\.env\.example$''',
+  '''(^|/)GLOSSARY\.md$''',
+  '''(^|/)AGENTS\.md$''',
+  '''(^|/)README\.md$''',
+  '''(^|/)SPEC\.md$''',
+  '''(^|/)docs/adr/''',
+]
