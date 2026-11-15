@@ -89,8 +89,9 @@ Watch the full interactive application demonstration on Loom:
 | **Backend**      | Python 3.12+, FastAPI, SQLModel (SQLAlchemy 2 + Pydantic v2), Uvicorn, HTTPX, `uv` | Schema-First API, strict Pydantic models, asynchronous HTTP calls, clean separation of concerns |
 | **Frontend**     | React 18, TypeScript 5.7+, Vite 6, Tailwind CSS, Lucide Icons, Zod                 | Discriminated Unions for async UI states, zero `any`/`as` casting, responsive Eco-Modern UI     |
 | **Database**     | SQLite (`smart_commute.db`)                                                        | Zero-config embedded database, automatic foreign key cascades, automatic initial seed           |
-| **Testing**      | Pytest, pytest-asyncio, Vitest, React Testing Library                              | 87 backend tests, 64 frontend tests, 100% critical path coverage                                |
-| **Tooling & CI** | Husky, lint-staged, Prettier, Commitlint, GitHub Actions CI                        | Strict Conventional Commits enforcement, automatic pre-commit linting & formatting              |
+| **Containers**   | Docker, Docker Compose, Nginx                                                      | Multi-stage builds, non-root `appuser`, Nginx reverse proxy, SQLite named volume persistence    |
+| **Testing**      | Pytest, pytest-asyncio, Vitest, React Testing Library                              | 92 backend tests, 64 frontend tests, 100% critical path coverage                                |
+| **Tooling & CI** | Husky, lint-staged, Prettier, Commitlint, GitHub Actions CI                        | Strict Conventional Commits enforcement, CodeQL SAST, Bandit, Gitleaks, Dependabot, Trivy       |
 
 ---
 
@@ -122,12 +123,33 @@ Domain language is standardized in the [Domain Glossary (`GLOSSARY.md`)](GLOSSAR
 
 #### Prerequisites
 
-- **Python 3.12+** installed and available in PATH (`python --version`)
-- **Node.js 18+** & **npm** installed (`node --version`)
+- **Option 0 (Docker):** Docker & Docker Compose (`docker --version`, `docker compose version`)
+- **Options A / B (Local):** Python 3.12+ (`python --version`) and Node.js 18+ & npm (`node --version`)
 
 ---
 
-#### Initial Dependency Setup (Only once after cloning)
+#### Option 0: Zero-Config Docker Compose Launch (Instant & Recommended)
+
+Start the entire application (FastAPI backend + React frontend via Nginx reverse proxy + persistent SQLite volume) with a single command:
+
+```bash
+docker compose up --build
+```
+
+- **Frontend Web Application:** [http://localhost:5173](http://localhost:5173)
+- **Interactive Swagger API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Backend Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
+
+_Data persistence & volume notes:_
+
+- Database data persists across `docker compose restart` and `docker compose down` inside the named volume `smart-commute-sqlite-data`.
+- To completely reset data and reload fresh Kraków seed data: `docker compose down -v`.
+- To pass optional LLM keys (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`), create a `.env` file from `.env.example`.
+- For deep architectural details, container permissions, and troubleshooting, see the [Docker & Containerization Guide (`docs/docker.md`)](docs/docker.md).
+
+---
+
+#### Initial Local Dependency Setup (Only for Options A & B without Docker)
 
 Before first startup, install dependencies for both services:
 
@@ -215,7 +237,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 Both frontend and backend are covered by comprehensive automated tests adhering to the **TDD (Test-Driven Development)** cycle.
 
-#### Backend Tests (87 tests)
+#### Backend Tests (92 tests)
 
 Tests cover pure calculations, SQLModel entities, cascade deletions, geocoding & Haversine formula, Open-Meteo client with timeout fallbacks, AI Advisor heuristic decisions, and complete REST API endpoints.
 
@@ -278,18 +300,23 @@ The AI recommendation feature was architected with high reliability:
 ```
 smart-commute/
 ├── .agents/skills/        # Context-Driven Development agent skills
-├── .github/workflows/     # GitHub Actions CI workflow (linting, tests, build)
+├── .github/
+│   ├── dependabot.yml     # Dependabot automated dependency scanning
+│   └── workflows/         # GitHub Actions workflows (CI, CodeQL SAST, Security audits)
+├── .gitleaks.toml         # Gitleaks credential scanner configuration & allowlists
 ├── .husky/                # Git pre-commit & commit-msg hooks
 ├── backend/
 │   ├── app/
-│   │   ├── main.py        # FastAPI entrypoint & CORS
+│   │   ├── main.py        # FastAPI entrypoint, healthcheck & CORS
 │   │   ├── database.py    # SQLite engine & session management
 │   │   ├── models.py      # SQLModel database tables
 │   │   ├── schemas.py     # Pydantic v2 schemas
 │   │   ├── seed.py        # Kraków commuter seed data
 │   │   ├── routers/       # HTTP endpoints (routes, commutes, advisor)
 │   │   └── services/      # eco_calc, geocoding, weather, ai_advisor
-│   ├── tests/             # 87 automated pytest tests
+│   ├── tests/             # 92 automated pytest tests (including CI security specs)
+│   ├── Dockerfile         # Multi-stage backend container image (uv + appuser)
+│   ├── .dockerignore      # Backend Docker context exclusions
 │   └── pyproject.toml     # Backend dependencies & configuration
 ├── frontend/
 │   ├── src/
@@ -298,11 +325,17 @@ smart-commute/
 │   │   ├── hooks/         # Custom React state hooks
 │   │   ├── components/    # Route, Commute, AI, and Dashboard UI
 │   │   └── utils/         # Math & geocoding helper functions
+│   ├── Dockerfile         # Multi-stage frontend container image (Node 22 + Nginx)
+│   ├── nginx.conf         # Nginx SPA fallback & API reverse proxy
+│   ├── .dockerignore      # Frontend Docker context exclusions
 │   ├── package.json       # Frontend dependencies & scripts
 │   └── vite.config.ts     # Vite build & Vitest test configuration
 ├── docs/
 │   ├── adr/               # Architecture Decision Records (0001 - 0004)
-│   └── agents/            # Domain, issue-tracker, and triage guidelines
+│   ├── agents/            # Domain, issue-tracker, and triage guidelines
+│   └── docker.md          # Complete Docker & containerization guide
+├── docker-compose.yml     # Multi-container orchestration (backend + frontend)
+├── .dockerignore          # Root Docker context ignore rules
 ├── AGENTS.md              # AI Agent engineering instructions & constitution
 ├── GLOSSARY.md            # Domain glossary (EN/PL)
 ├── SPEC.md                # Full MVP technical specification
@@ -387,13 +420,14 @@ Obejrzyj pełną prezentację działania aplikacji na platformie Loom:
 
 ### Stos technologiczny
 
-| Warstwa         | Technologie                                                                        | Wyróżniki                                                                                |
-| :-------------- | :--------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| **Backend**     | Python 3.12+, FastAPI, SQLModel (SQLAlchemy 2 + Pydantic v2), Uvicorn, HTTPX, `uv` | Podejście Schema-First, modele Pydantic, asynchroniczne wywołania HTTP, separacja warstw |
-| **Frontend**    | React 18, TypeScript 5.7+, Vite 6, Tailwind CSS, Lucide Icons, Zod                 | Unie dyskryminowane dla stanów asynchronicznych, brak `any`/`as`, stylistyka Eco-Modern  |
-| **Baza danych** | SQLite (`smart_commute.db`)                                                        | Wbudowana lekka baza, automatyczne kaskady kluczy obcych, automatyczny seed startowy     |
-| **Testy**       | Pytest, pytest-asyncio, Vitest, React Testing Library                              | 87 testów backendowych, 64 testy frontendowe, 100% pokrycia ścieżek krytycznych          |
-| **Jakość i CI** | Husky, lint-staged, Prettier, Commitlint, GitHub Actions CI                        | Egzekwowanie Conventional Commits, automatyczny linter i formatter pre-commit            |
+| Warstwa            | Technologie                                                                        | Wyróżniki                                                                                     |
+| :----------------- | :--------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
+| **Backend**        | Python 3.12+, FastAPI, SQLModel (SQLAlchemy 2 + Pydantic v2), Uvicorn, HTTPX, `uv` | Podejście Schema-First, modele Pydantic, asynchroniczne wywołania HTTP, separacja warstw      |
+| **Frontend**       | React 18, TypeScript 5.7+, Vite 6, Tailwind CSS, Lucide Icons, Zod                 | Unie dyskryminowane dla stanów asynchronicznych, brak `any`/`as`, stylistyka Eco-Modern       |
+| **Baza danych**    | SQLite (`smart_commute.db`)                                                        | Wbudowana lekka baza, automatyczne kaskady kluczy obcych, automatyczny seed startowy          |
+| **Konteneryzacja** | Docker, Docker Compose, Nginx                                                      | Multi-stage buildy, nieuprzywilejowany `appuser`, reverse proxy Nginx, persystencja wolumenów |
+| **Testy**          | Pytest, pytest-asyncio, Vitest, React Testing Library                              | 92 testy backendowe, 64 testy frontendowe, 100% pokrycia ścieżek krytycznych                  |
+| **Jakość i CI**    | Husky, lint-staged, Prettier, Commitlint, GitHub Actions CI                        | Egzekwowanie Conventional Commits, CodeQL SAST, Bandit, Gitleaks, Dependabot, Trivy           |
 
 ---
 
@@ -425,12 +459,33 @@ Język domeny został zdefiniowany w [Słowniku Domenowym (`GLOSSARY.md`)](GLOSS
 
 #### Wymagania wstępne
 
-- **Python 3.12+** w zmiennej PATH (`python --version`)
-- **Node.js 18+** oraz **npm** (`node --version`)
+- **Opcja 0 (Docker):** Docker oraz Docker Compose (`docker --version`, `docker compose version`)
+- **Opcje A / B (Lokalnie):** Python 3.12+ (`python --version`) oraz Node.js 18+ z npm (`node --version`)
 
 ---
 
-#### Wstępna instalacja zależności (Tylko raz po sklonowaniu)
+#### Opcja 0: Uruchomienie przez Docker Compose (Zero-Config, Błyskawiczne i Zalecane)
+
+Uruchomienie kompletnego środowiska (backend FastAPI + frontend React przez reverse proxy Nginx + trwały wolumen bazy SQLite) jednym poleceniem:
+
+```bash
+docker compose up --build
+```
+
+- **Aplikacja webowa Frontend:** [http://localhost:5173](http://localhost:5173)
+- **Interaktywna dokumentacja Swagger API:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Endpoint stanu aplikacji (Healthcheck):** [http://localhost:8000/health](http://localhost:8000/health)
+
+_Zarządzanie danymi i wolumenami:_
+
+- Baza danych zachowuje stan między zatrzymaniem i restartem kontenerów (`docker compose restart`, `docker compose down`) w nazwanym wolumenie `smart-commute-sqlite-data`.
+- Całkowity reset bazy i przywrócenie czystych danych startowych: `docker compose down -v`.
+- Opcjonalne klucze API modeli AI (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) można przekazać w pliku `.env`.
+- Szczegółowe informacje o uprawnieniach, architekturze kontenerów i rozwiązywaniu problemów znajdziesz w przewodniku [Docker & Containerization Guide (`docs/docker.md`)](docs/docker.md).
+
+---
+
+#### Wstępna instalacja zależności (Tylko dla Opcji A i B bez Dockera)
 
 Przed pierwszym uruchomieniem zainstaluj zależności obu części projektu:
 
@@ -520,7 +575,7 @@ Aplikacja otworzy się pod adresem [http://localhost:5173](http://localhost:5173
 
 Zarówno frontend, jak i backend posiadają kompletne zestawy testów automatycznych rozwijane w cyklu **TDD (Test-Driven Development)**.
 
-#### Testy Backendu (87 testów)
+#### Testy Backendu (92 testy)
 
 Testy weryfikują czyste kalkulacje ekologiczne, modele SQLModel, kaskadowe usuwanie, geokodowanie i wzór Haversine, odporność klienta Open-Meteo na timeouty, matrycę decyzyjną Doradcy AI oraz wszystkie endpointy REST API.
 
@@ -584,17 +639,23 @@ Funkcjonalność doradcy AI została zaprojektowana z myślą o maksymalnej niez
 smart-commute/
 ├── .agents/skills/        # Dedykowane umiejętności asystenta AI (Context-Driven Development)
 ├── .github/workflows/     # Pipeline CI GitHub Actions (linter, testy, build)
+├── .github/
+│   ├── dependabot.yml     # Automatyczne aktualizacje Dependabota dla pip, npm i Actions
+│   └── workflows/         # Przepływy GitHub Actions (CI, CodeQL SAST, audyty bezpieczeństwa)
+├── .gitleaks.toml         # Konfiguracja skanera wycieków sekretów Gitleaks
 ├── .husky/                # Hooki gita pre-commit oraz commit-msg
 ├── backend/
 │   ├── app/
-│   │   ├── main.py        # Punkt wejścia aplikacji FastAPI i konfiguracja CORS
+│   │   ├── main.py        # Punkt wejścia aplikacji FastAPI, healthcheck i konfiguracja CORS
 │   │   ├── database.py    # Silnik SQLite i zarządzanie sesją DB
 │   │   ├── models.py      # Encje bazodanowe SQLModel
 │   │   ├── schemas.py     # Schematy walidacyjne Pydantic v2
 │   │   ├── seed.py        # Dane startowe dla Krakowa
 │   │   ├── routers/       # Endpointy HTTP (routes, commutes, advisor)
 │   │   └── services/      # eco_calc, geocoding, weather, ai_advisor
-│   ├── tests/             # 87 zautomatyzowanych testów pytest
+│   ├── tests/             # 92 zautomatyzowane testy pytest (w tym testy specyfikacji CI)
+│   ├── Dockerfile         # Wieloetapowy obraz kontenera backendu (uv + appuser)
+│   ├── .dockerignore      # Reguły wykluczeń kontekstu Dockera dla backendu
 │   └── pyproject.toml     # Zależności i konfiguracja backendu
 ├── frontend/
 │   ├── src/
@@ -603,11 +664,17 @@ smart-commute/
 │   │   ├── hooks/         # Dedykowane hooki stanu React
 │   │   ├── components/    # Komponenty UI (trasy, dziennik dojazdów, doradca AI, dashboard)
 │   │   └── utils/         # Funkcje pomocnicze kalkulacji i geokodowania
+│   ├── Dockerfile         # Wieloetapowy obraz kontenera frontendu (Node 22 + Nginx)
+│   ├── nginx.conf         # Konfiguracja Nginx (fallback SPA i reverse proxy API)
+│   ├── .dockerignore      # Reguły wykluczeń kontekstu Dockera dla frontendu
 │   ├── package.json       # Zależności i skrypty frontendu
 │   └── vite.config.ts     # Konfiguracja bundlera Vite i testów Vitest
 ├── docs/
 │   ├── adr/               # Udokumentowane decyzje architektoniczne (ADR 0001 - 0004)
-│   └── agents/            # Wytyczne domenowe, tracker zadań i etykiety triage
+│   ├── agents/            # Wytyczne domenowe, tracker zadań i etykiety triage
+│   └── docker.md          # Kompletny przewodnik konteneryzacji i Dockera
+├── docker-compose.yml     # Orkiestracja wielu kontenerów (backend + frontend)
+├── .dockerignore          # Główne reguły wykluczeń kontekstu Dockera
 ├── AGENTS.md              # Zasady inżynierskie i instrukcje dla agentów AI
 ├── GLOSSARY.md            # Słownik pojęć domenowych (EN/PL)
 ├── SPEC.md                # Pełna specyfikacja techniczna MVP

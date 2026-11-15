@@ -45,6 +45,17 @@ def test_cors_headers_configured_for_frontend(client_with_clean_db: TestClient):
     )
 
 
+def test_health_check_endpoints(client_with_clean_db: TestClient):
+    """GET /health and GET /api/health return HTTP 200 with status ok."""
+    resp1 = client_with_clean_db.get("/health")
+    assert resp1.status_code == 200
+    assert resp1.json() == {"status": "ok"}
+
+    resp2 = client_with_clean_db.get("/api/health")
+    assert resp2.status_code == 200
+    assert resp2.json() == {"status": "ok"}
+
+
 def test_get_routes_auto_seeds_when_database_is_empty(
     client_with_clean_db: TestClient,
 ):

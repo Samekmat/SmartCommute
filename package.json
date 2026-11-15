@@ -5,7 +5,9 @@
   "scripts": {
     "prepare": "husky",
     "start": "python run.py",
-    "dev": "python run.py"
+    "dev": "python run.py",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

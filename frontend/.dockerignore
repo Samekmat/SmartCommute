@@ -1,0 +1,14 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies and build artifacts
+node_modules
+dist
+.vite
+*.tsbuildinfo
+
+# Local secrets and testing caches
+.env
+.env.*
+coverage

@@ -27,6 +27,16 @@ engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 def init_db(target_engine: Engine | None = None) -> None:
     """Create all SQLModel database tables for the active engine."""
     active_engine = target_engine or engine
+    if (
+        active_engine.url.drivername == "sqlite"
+        and active_engine.url.database
+        and active_engine.url.database != ":memory:"
+    ):
+        from pathlib import Path
+
+        db_path = Path(active_engine.url.database)
+        if db_path.parent and str(db_path.parent) != ".":
+            db_path.parent.mkdir(parents=True, exist_ok=True)
     SQLModel.metadata.create_all(active_engine)
 
 

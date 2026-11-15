@@ -1,5 +1,6 @@
 """FastAPI application entry point for SmartCommute."""
 
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -46,17 +47,34 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Explicit CORS configuration required by AGENTS.md
+# Explicit CORS configuration required by AGENTS.md, configurable via CORS_ORIGINS
+default_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+env_cors = os.getenv("CORS_ORIGINS", "")
+allowed_origins = list(default_origins)
+if env_cors:
+    for origin in env_cors.split(","):
+        cleaned = origin.strip()
+        if cleaned and cleaned not in allowed_origins:
+            allowed_origins.append(cleaned)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health", tags=["system"])
+@app.get("/api/health", tags=["system"])
+def health_check() -> dict[str, str]:
+    """Provide container and application health status check."""
+    return {"status": "ok"}
+
 
 app.include_router(routes.router)
 app.include_router(commutes.router)

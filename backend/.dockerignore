@@ -1,0 +1,24 @@
+# Git and temporary files
+.git
+.gitignore
+
+# Virtual environments and dependencies
+.venv
+__pycache__
+*/__pycache__
+*/*/__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Testing and caching
+.pytest_cache
+.ruff_cache
+tests
+
+# Local databases and environment secrets
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*

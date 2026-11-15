@@ -1,0 +1,30 @@
+# Version control and agent workspace
+.git
+.github
+.agents
+.vscode
+.idea
+
+# Backend build and environment artifacts
+backend/.venv
+backend/.pytest_cache
+backend/.ruff_cache
+backend/*.db
+backend/*.sqlite*
+**/__pycache__
+**/*.pyc
+**/*.pyo
+
+# Frontend build artifacts and node_modules
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/*.tsbuildinfo
+
+# Local secrets and persistent database files
+*.db
+*.sqlite
+*.sqlite3
+*.log
+.env
+.env.*
