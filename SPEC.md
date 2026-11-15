@@ -61,6 +61,33 @@ The application helps users manage daily commute routes, track environmental and
     - `calories_estimate`: int
     - `ai_source`: `"llm" | "heuristic_fallback"`
 
+### Presentation Layer & UI/UX Design System
+
+1. **Color Palette (Eco-Modern):**
+   - **Primary / Eco:** `Emerald` / `Teal` (`emerald-600` / `teal-600`) — represents ecological impact, CO2 savings, and active mobility.
+   - **Neutrals & Surfaces:** `Slate` (`bg-slate-50` app background, `bg-white` cards, `border-slate-200` borders, `text-slate-900` headings, `text-slate-600` body).
+   - **Weather Accents:** Rain (`sky-500` / `blue-600`), Sun (`amber-500`), Wind (`indigo-500`), Freezing Cold (`cyan-500`).
+
+2. **Transport Mode Visual Mappings (Lucide Icons):**
+   - `car`: `<Car />` with `bg-slate-100 text-slate-700` (baseline comparison).
+   - `public_transit`: `<Bus />` or `<Train />` with `bg-indigo-50 text-indigo-700`.
+   - `bike`: `<Bike />` with `bg-emerald-50 text-emerald-700` (zero emission + active).
+   - `walk`: `<Footprints />` with `bg-teal-50 text-teal-700` (zero emission + maximum calories).
+
+3. **Dashboard Layout Architecture:**
+   - **Header:** Branding with quick summary pills (Total CO2 saved, total calories burned, trips count).
+   - **AI Advisor Hero Card ("How should I commute today?"):**
+     - Live weather indicator from Open-Meteo.
+     - **Weather Simulator pills:** _Live Weather_, _Heavy Rain_, _Sunny_, _Strong Wind_, _Freezing Cold_.
+     - Structured recommendation card with estimated travel time and ecological benefits.
+   - **Routes Grid:** Manageable route cards with actions (_"Ask AI"_, _"Log Commute"_, _"Edit"_, _"Delete"_) and _"Add Route"_ modal.
+   - **Commute Timeline:** Recent trip log with visual impact badges (e.g., `+1.3 kg CO₂`, `+160 kcal`).
+
+4. **Async States & Ergonomics:**
+   - Skeleton loaders during data fetching to prevent layout shifts.
+   - Explicit empty states for routes and history.
+   - Smooth transitions (`hover:shadow-md transition-all`, `rounded-xl`).
+
 ---
 
 <a name="wersja-polska"></a>
@@ -121,3 +148,30 @@ Aplikacja pomaga użytkownikom zarządzać codziennymi trasami dojazdów, śledz
     - `potential_co2_saved_kg`: float
     - `calories_estimate`: int
     - `ai_source`: `"llm" | "heuristic_fallback"`
+
+### Warstwa Prezentacji i Wytyczne UI/UX
+
+1. **Paleta kolorów (Stylistyka Eco-Modern):**
+   - **Główny akcent eko:** `Emerald` / `Teal` (`emerald-600` / `teal-600`) — symbolizuje ekologiczny wpływ, redukcję CO2 i zrównoważony transport.
+   - **Powierzchnie i tła:** `Slate` (`bg-slate-50` tło aplikacji, `bg-white` karty, `border-slate-200` ramki, `text-slate-900` nagłówki, `text-slate-600` treść).
+   - **Akcenty pogodowe:** Deszcz (`sky-500` / `blue-600`), Słońce (`amber-500`), Wiatr (`indigo-500`), Mróz (`cyan-500`).
+
+2. **Wizualna tożsamość środków transportu (Ikony Lucide):**
+   - `car`: `<Car />` z `bg-slate-100 text-slate-700` (opcja referencyjna).
+   - `public_transit`: `<Bus />` lub `<Train />` z `bg-indigo-50 text-indigo-700`.
+   - `bike`: `<Bike />` z `bg-emerald-50 text-emerald-700` (zero emisji + aktywne kalorie).
+   - `walk`: `<Footprints />` z `bg-teal-50 text-teal-700` (zero emisji + najwyższe spalanie).
+
+3. **Architektura Dashboardu:**
+   - **Header:** Logo z pigułkami szybkich statystyk globalnych (Suma CO2, Spalone kalorie, Liczba tras).
+   - **Karta Hero Asystenta AI („Czym dziś jechać?”):**
+     - Wskaźnik bieżącej pogody z Open-Meteo.
+     - **Pigułki Symulatora Pogody:** _Pogoda na żywo_, _Ulewa_, _Słońce_, _Silny wiatr_, _Mróz_.
+     - Karta rekomendacji z uzasadnieniem, szacowanym czasem i bilansem eko.
+   - **Siatka tras (Routes Grid):** Karty tras z akcjami (_„Pytaj AI”_, _„Zaloguj przejazd”_, _„Edytuj”_, _„Usuń”_) oraz modal dodawania nowej trasy.
+   - **Oś czasu przejazdów (Commute Timeline):** Ostatnie przejazdy z wyróżnionymi zyskami eko (np. `+1.3 kg CO₂`, `+160 kcal`).
+
+4. **Stany asynchroniczne i ergonomia:**
+   - Szkielety (Skeletons) podczas ładowania danych eliminujące skakanie widoku (layout shift).
+   - Przyjazne stany pustki (Empty States).
+   - Płynne mikromomenty (`hover:shadow-md transition-all`, `rounded-xl`).
