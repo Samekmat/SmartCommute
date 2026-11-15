@@ -78,6 +78,19 @@ def test_create_route_success(client_with_clean_db: TestClient):
     assert created["distance_km"] == 2.4
 
 
+def test_get_commutes_returns_empty_when_database_is_fresh(
+    client_with_clean_db: TestClient,
+):
+    """GET /api/commutes returns zeroed totals and empty list on fresh database."""
+    response = client_with_clean_db.get("/api/commutes")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["logs"] == []
+    assert data["trips_count"] == 0
+    assert data["total_co2_saved_kg"] == 0.0
+    assert data["total_calories"] == 0
+
+
 def test_create_route_validation_error(client_with_clean_db: TestClient):
     """POST /api/routes with non-positive distance returns HTTP 422."""
     payload = {
@@ -88,6 +101,76 @@ def test_create_route_validation_error(client_with_clean_db: TestClient):
         "preferred_transport": "bike",
     }
     response = client_with_clean_db.post("/api/routes", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "invalid_payload",
+    [
+        {
+            "name": "",
+            "origin": "A",
+            "destination": "B",
+            "distance_km": 5.0,
+            "preferred_transport": "bike",
+        },
+        {
+            "name": "Trasa",
+            "origin": "",
+            "destination": "B",
+            "distance_km": 5.0,
+            "preferred_transport": "bike",
+        },
+        {
+            "name": "Trasa",
+            "origin": "A",
+            "destination": "",
+            "distance_km": 5.0,
+            "preferred_transport": "bike",
+        },
+        {
+            "name": "Trasa",
+            "origin": "A",
+            "destination": "B",
+            "distance_km": 0.0,
+            "preferred_transport": "bike",
+        },
+        {
+            "name": "Trasa",
+            "origin": "A",
+            "destination": "B",
+            "distance_km": 5.0,
+            "preferred_transport": "hoverboard",
+        },
+    ],
+)
+def test_create_route_validation_errors_matrix(
+    client_with_clean_db: TestClient, invalid_payload: dict
+):
+    """POST /api/routes rejects invalid payload combinations with HTTP 422."""
+    response = client_with_clean_db.post("/api/routes", json=invalid_payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "invalid_update",
+    [
+        {"name": ""},
+        {"origin": ""},
+        {"destination": ""},
+        {"distance_km": 0.0},
+        {"distance_km": -4.2},
+        {"preferred_transport": "teleportation"},
+    ],
+)
+def test_update_route_validation_errors(
+    client_with_clean_db: TestClient, invalid_update: dict
+):
+    """PUT /api/routes/{id} rejects invalid updates with HTTP 422."""
+    routes = client_with_clean_db.get("/api/routes").json()
+    route_id = routes[0]["id"]
+
+    response = client_with_clean_db.put(f"/api/routes/{route_id}", json=invalid_update)
     assert response.status_code == 422
 
 
@@ -110,19 +193,29 @@ def test_update_route_success_and_not_found(client_with_clean_db: TestClient):
 
 
 def test_delete_route_cascades_logs(client_with_clean_db: TestClient):
-    """DELETE /api/routes/{id} removes the route with HTTP 204."""
+    """DELETE /api/routes/{id} removes the route and cascades its commute logs with HTTP 204."""
     routes = client_with_clean_db.get("/api/routes").json()
     route_id = routes[0]["id"]
+
+    initial_commutes = client_with_clean_db.get("/api/commutes").json()
+    initial_route_logs = [
+        log for log in initial_commutes["logs"] if log["route_id"] == route_id
+    ]
+    assert len(initial_route_logs) > 0
 
     response = client_with_clean_db.delete(f"/api/routes/{route_id}")
     assert response.status_code == 204
 
-    # Verify route no longer returned
     get_res = client_with_clean_db.get("/api/routes")
     remaining_ids = [r["id"] for r in get_res.json()]
     assert route_id not in remaining_ids
 
-    # 404 on deleting non-existent route
+    updated_commutes = client_with_clean_db.get("/api/commutes").json()
+    cascaded_logs = [
+        log for log in updated_commutes["logs"] if log["route_id"] == route_id
+    ]
+    assert cascaded_logs == []
+
     assert client_with_clean_db.delete("/api/routes/99999").status_code == 404
 
 
@@ -177,6 +270,24 @@ def test_post_commute_for_nonexistent_route_returns_404(
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize(
+    "invalid_commute",
+    [
+        {"route_id": 1, "transport_mode": "walk", "duration_minutes": 0},
+        {"route_id": 1, "transport_mode": "walk", "duration_minutes": -15},
+        {"route_id": 1, "transport_mode": "flying_carpet", "duration_minutes": 20},
+        {"transport_mode": "bike", "duration_minutes": 20},  # missing route_id
+    ],
+)
+def test_post_commute_validation_errors_matrix(
+    client_with_clean_db: TestClient, invalid_commute: dict
+):
+    """POST /api/commutes rejects invalid commute payloads with HTTP 422."""
+    client_with_clean_db.get("/api/routes")  # seed routes
+    response = client_with_clean_db.post("/api/commutes", json=invalid_commute)
+    assert response.status_code == 422
+
+
 def test_ai_recommend_endpoint_with_simulator_override(
     client_with_clean_db: TestClient,
 ):
@@ -207,3 +318,16 @@ def test_ai_recommend_for_nonexistent_route_returns_404(
         "/api/routes/99999/ai-recommend", json={"weather_override": "sunny"}
     )
     assert response.status_code == 404
+
+
+def test_ai_recommend_invalid_weather_override_returns_422(
+    client_with_clean_db: TestClient,
+):
+    """POST /api/routes/{id}/ai-recommend with invalid weather override returns HTTP 422."""
+    routes = client_with_clean_db.get("/api/routes").json()
+    route_id = routes[0]["id"]
+
+    response = client_with_clean_db.post(
+        f"/api/routes/{route_id}/ai-recommend", json={"weather_override": "cyclone"}
+    )
+    assert response.status_code == 422

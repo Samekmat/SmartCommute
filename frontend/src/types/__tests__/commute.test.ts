@@ -6,9 +6,13 @@ import {
   CommuteHistoryResponseSchema,
   CommuteLogCreateSchema,
   CommuteLogSchema,
+  errorState,
+  idleState,
+  loadingState,
   RouteCreateSchema,
   RouteSchema,
   RouteUpdateSchema,
+  successState,
   TransportMode,
   WeatherOverrideSchema,
 } from "../commute";
@@ -77,6 +81,38 @@ describe("Route Schemas Validation", () => {
     };
 
     expect(() => RouteSchema.parse(invalidRawRoute)).toThrow();
+  });
+
+  it("rejects RouteCreate with non-positive distance or empty destination", () => {
+    expect(() =>
+      RouteCreateSchema.parse({
+        name: "Test",
+        origin: "A",
+        destination: "",
+        distance_km: 5.0,
+        preferred_transport: "car",
+      })
+    ).toThrow();
+
+    expect(() =>
+      RouteCreateSchema.parse({
+        name: "Test",
+        origin: "A",
+        destination: "B",
+        distance_km: 0,
+        preferred_transport: "car",
+      })
+    ).toThrow();
+
+    expect(() =>
+      RouteCreateSchema.parse({
+        name: "Test",
+        origin: "A",
+        destination: "B",
+        distance_km: 5.0,
+        preferred_transport: "scooter",
+      })
+    ).toThrow();
   });
 
   it("validates RouteCreate with default coordinates", () => {
@@ -158,6 +194,40 @@ describe("Commute Log Schemas Validation", () => {
     const parsed = CommuteLogCreateSchema.parse(payload);
     expect(parsed.duration_minutes).toBe(40);
   });
+
+  it("rejects invalid CommuteLogCreate payloads", () => {
+    expect(() =>
+      CommuteLogCreateSchema.parse({
+        route_id: 1,
+        transport_mode: "walk",
+        duration_minutes: 0,
+      })
+    ).toThrow();
+
+    expect(() =>
+      CommuteLogCreateSchema.parse({
+        route_id: 1,
+        transport_mode: "walk",
+        duration_minutes: -10,
+      })
+    ).toThrow();
+
+    expect(() =>
+      CommuteLogCreateSchema.parse({
+        route_id: 1,
+        transport_mode: "hovercraft",
+        duration_minutes: 15,
+      })
+    ).toThrow();
+
+    expect(() =>
+      CommuteLogCreateSchema.parse({
+        route_id: 1.5,
+        transport_mode: "walk",
+        duration_minutes: 15,
+      })
+    ).toThrow();
+  });
 });
 
 describe("AI Recommendation Schemas", () => {
@@ -199,9 +269,56 @@ describe("AI Recommendation Schemas", () => {
     expect(WeatherOverrideSchema.parse("cold")).toBe("cold");
     expect(() => WeatherOverrideSchema.parse("snow")).toThrow();
   });
+
+  it("rejects invalid AIRecommendationResponse payloads", () => {
+    expect(() =>
+      AIRecommendationResponseSchema.parse({
+        recommended_mode: "bike",
+        weather_summary: "15°C",
+        reasoning: "Test",
+        estimated_duration_min: 20,
+        potential_co2_saved_kg: 0.5,
+        calories_estimate: 50,
+      })
+    ).toThrow();
+
+    expect(() =>
+      AIRecommendationResponseSchema.parse({
+        recommended_mode: "bike",
+        weather_summary: "15°C",
+        reasoning: "Test",
+        estimated_duration_min: 20,
+        potential_co2_saved_kg: 0.5,
+        calories_estimate: 50,
+        ai_source: "crystal_ball",
+      })
+    ).toThrow();
+
+    expect(() =>
+      AIRecommendationResponseSchema.parse({
+        recommended_mode: "bike",
+        weather_summary: "15°C",
+        reasoning: "Test",
+        estimated_duration_min: 20,
+        potential_co2_saved_kg: -0.5,
+        calories_estimate: 50,
+        ai_source: "llm",
+      })
+    ).toThrow();
+  });
 });
 
 describe("AsyncState Discriminated Union", () => {
+  it("creates valid states via constructor helpers", () => {
+    expect(idleState()).toEqual({ status: "idle" });
+    expect(loadingState()).toEqual({ status: "loading" });
+    expect(successState("payload")).toEqual({
+      status: "success",
+      data: "payload",
+    });
+    expect(errorState("boom")).toEqual({ status: "error", message: "boom" });
+  });
+
   it("correctly models all asynchronous UI states", () => {
     const idle: AsyncState<string> = { status: "idle" };
     const loading: AsyncState<string> = { status: "loading" };

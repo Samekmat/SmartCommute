@@ -1,12 +1,157 @@
 """Tests for AI Advisor recommendation service and Zero-Config deterministic fallback."""
 
+import json
+
 import pytest
 from app.models import Route
+from app.schemas import AIRecommendationResponse
 from app.services.ai_advisor import (
     AIRecommendation,
     get_commute_recommendation,
 )
 from app.services.weather import WeatherData
+
+
+@pytest.mark.asyncio
+async def test_zero_config_fallback_when_api_key_env_var_unset_or_empty(
+    sample_medium_route: Route, monkeypatch: pytest.MonkeyPatch
+):
+    """When OPENAI_API_KEY is missing or empty, heuristic fallback returns valid JSON structure."""
+    fair_weather = WeatherData(
+        temperature_c=20.0,
+        precipitation_mm=0.0,
+        wind_speed_kmh=10.0,
+        weather_summary="20°C, sunny",
+    )
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    rec1 = await get_commute_recommendation(sample_medium_route, fair_weather)
+    assert rec1.ai_source == "heuristic_fallback"
+    assert rec1.recommended_mode == "bike"
+
+    # Verify deterministic fallback conforms to valid serialized JSON schema
+    serialized_dto = AIRecommendationResponse.model_validate(rec1)
+    json_payload = serialized_dto.model_dump()
+    assert json_payload["ai_source"] == "heuristic_fallback"
+    assert json_payload["recommended_mode"] == "bike"
+    assert json_payload["estimated_duration_min"] > 0
+    assert json.loads(json.dumps(json_payload)) == json_payload
+
+    monkeypatch.setenv("OPENAI_API_KEY", "   ")
+    rec2 = await get_commute_recommendation(sample_medium_route, fair_weather)
+    assert rec2.ai_source == "heuristic_fallback"
+    assert rec2.recommended_mode == "bike"
+
+
+@pytest.mark.asyncio
+async def test_zero_config_fallback_cool_and_hot_weather_conditions():
+    """Cool weather (0-10°C) and hot weather (>25°C) follow active vs transit thresholds."""
+    cool_weather = WeatherData(
+        temperature_c=6.0,
+        precipitation_mm=0.0,
+        wind_speed_kmh=10.0,
+        weather_summary="6°C, cool",
+    )
+    hot_weather = WeatherData(
+        temperature_c=29.0,
+        precipitation_mm=0.0,
+        wind_speed_kmh=12.0,
+        weather_summary="29°C, hot",
+    )
+
+    short_route = Route(
+        id=10,
+        name="Short",
+        origin="A",
+        destination="B",
+        distance_km=1.8,
+        preferred_transport="bike",
+    )
+    rec_cool_short = await get_commute_recommendation(
+        short_route, cool_weather, openai_api_key=None
+    )
+    assert rec_cool_short.recommended_mode == "walk"
+
+    rec_hot_short = await get_commute_recommendation(
+        short_route, hot_weather, openai_api_key=None
+    )
+    assert rec_hot_short.recommended_mode == "walk"
+
+    bike_route = Route(
+        id=11,
+        name="Bike Medium",
+        origin="A",
+        destination="B",
+        distance_km=5.0,
+        preferred_transport="bike",
+    )
+    rec_bike = await get_commute_recommendation(
+        bike_route, cool_weather, openai_api_key=None
+    )
+    assert rec_bike.recommended_mode == "bike"
+
+    transit_route = Route(
+        id=12,
+        name="Transit Medium",
+        origin="A",
+        destination="B",
+        distance_km=5.0,
+        preferred_transport="car",
+    )
+    rec_transit = await get_commute_recommendation(
+        transit_route, cool_weather, openai_api_key=None
+    )
+    assert rec_transit.recommended_mode == "public_transit"
+
+
+@pytest.mark.asyncio
+async def test_zero_config_fallback_freezing_weather_preference_split():
+    """In freezing weather, route over 4km with car preference chooses car, else public_transit."""
+    freezing = WeatherData(
+        temperature_c=-3.0,
+        precipitation_mm=0.0,
+        wind_speed_kmh=10.0,
+        weather_summary="-3°C, freezing",
+    )
+
+    long_car_route = Route(
+        id=20,
+        name="Car commute",
+        origin="A",
+        destination="B",
+        distance_km=6.0,
+        preferred_transport="car",
+    )
+    rec_car = await get_commute_recommendation(
+        long_car_route, freezing, openai_api_key=None
+    )
+    assert rec_car.recommended_mode == "car"
+
+    short_car_route = Route(
+        id=21,
+        name="Short car commute",
+        origin="A",
+        destination="B",
+        distance_km=3.0,
+        preferred_transport="car",
+    )
+    rec_short = await get_commute_recommendation(
+        short_car_route, freezing, openai_api_key=None
+    )
+    assert rec_short.recommended_mode == "public_transit"
+
+    long_bike_route = Route(
+        id=22,
+        name="Long bike commute",
+        origin="A",
+        destination="B",
+        distance_km=6.0,
+        preferred_transport="bike",
+    )
+    rec_bike = await get_commute_recommendation(
+        long_bike_route, freezing, openai_api_key=None
+    )
+    assert rec_bike.recommended_mode == "public_transit"
 
 
 @pytest.fixture
