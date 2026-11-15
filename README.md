@@ -22,6 +22,8 @@ SmartCommute is a Full-Stack MVP web application built for the **Xelerit** recru
 
 Watch the full interactive application demonstration on Loom:
 
+[![SmartCommute Interactive Demo Preview](docs/assets/demo-preview.gif)](https://www.loom.com/share/e0ed60f7f22841d1921ba68ebbda596a)
+
 [![SmartCommute Demo Video](https://img.shields.io/badge/Loom-Watch_Application_Demo_Video-5452FF?style=for-the-badge&logo=loom&logoColor=white)](https://www.loom.com/share/e0ed60f7f22841d1921ba68ebbda596a)
 
 > **Direct URL:** [https://www.loom.com/share/e0ed60f7f22841d1921ba68ebbda596a](https://www.loom.com/share/e0ed60f7f22841d1921ba68ebbda596a)
@@ -357,6 +359,8 @@ SmartCommute to pełnostosowa aplikacja internetowa (Full-Stack MVP) przygotowan
 ### 🎥 Prezentacja wideo (Demo)
 
 Obejrzyj pełną prezentację działania aplikacji na platformie Loom:
+
+[![SmartCommute - Podgląd Demo Aplikacji](docs/assets/demo-preview.gif)](https://www.loom.com/share/e0ed60f7f22841d1921ba68ebbda596a)
 
 [![SmartCommute Demo Video](https://img.shields.io/badge/Loom-Obejrzyj_Wideo_Demo_Aplikacji-5452FF?style=for-the-badge&logo=loom&logoColor=white)](https://www.loom.com/share/e0ed60f7f22841d1921ba68ebbda596a)
 
