@@ -30,6 +30,18 @@ Ten projekt to Full-Stack MVP (**Python FastAPI + React TypeScript**) realizowan
 - Endpoint `POST /api/routes/{id}/ai-recommend` łączy dane o trasie z pogodą z **Open-Meteo API** (lub opcjonalnym symulatorem pogody przekazanym z UI do celów demonstracyjnych).
 - **Zero-Config Fallback (Krytyczne dla rekrutera):** Jeśli w środowisku brakuje `OPENAI_API_KEY`, serwis `ai_advisor.py` musi płynnie przełączyć się na deterministyczny silnik rekomendacji kontekstowej, zwracając identyczną strukturę JSON. Aplikacja musi działać w 100% od razu po uruchomieniu bez konfigurowania kluczy API.
 
+## 4. Git & Commit Hygiene (Conventional Commits)
+
+- Każdy commit w projekcie **musi** być bezwzględnie zgodny ze standardem **Conventional Commits**:
+  - `feat: ...` – nowa funkcjonalność dla użytkownika
+  - `fix: ...` – naprawa błędu
+  - `docs: ...` – zmiany w dokumentacji
+  - `ci: ...` – zmiany w pipeline GitHub Actions, hookach pre-commit, commitlint
+  - `refactor: ...` – refaktoryzacja kodu bez zmiany zachowania
+  - `test: ...` – dodanie lub zmiana testów
+  - `chore: ...` – zadania pomocnicze, aktualizacja zależności
+- Standard jest walidowany i egzekwowany automatycznie przed każdym commitem za pośrednictwem hooka `commit-msg` (Husky + Commitlint).
+
 ## Agent skills
 
 ### Issue tracker
