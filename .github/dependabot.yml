@@ -84,6 +84,9 @@ updates:
       # Keep tailwindcss on v3 until deliberate migration to v4 (@tailwindcss/postcss) is performed
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
+      # Keep jsdom on v29 due to undici 8 node engine requirements (^22.22 / >=26)
+      - dependency-name: "jsdom"
+        update-types: ["version-update:semver-major"]
 
   # Maintain backend FastAPI/Python dependencies
   - package-ecosystem: "pip"
