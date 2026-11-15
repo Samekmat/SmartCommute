@@ -25,14 +25,16 @@ The application helps users manage daily commute routes, track environmental and
 
 2. **`CommuteLog` (Recorded commute history):**
    - `id`: int (Primary Key)
-   - `route_id`: int (Foreign Key -> `Route.id`, `ondelete="CASCADE"`)
+   - `route_id`: int (Foreign Key -> `Route.id`, `ondelete="CASCADE"`: deleting a route purges its logs for predictable MVP lifecycle)
    - `transport_mode`: Literal["car", "bike", "public_transit", "walk"]
    - `duration_minutes`: int (`> 0`)
    - `co2_saved_kg`: float (calculated against baseline car emission 0.17 kg/km)
    - `calories_burned`: int (calculated automatically for bike and walk)
    - `logged_at`: datetime
 
-### Domain Logic (`services/eco_calc.py`)
+### Domain Logic & Decision Matrix (`services/`)
+
+#### 1. Eco Calculation (`services/eco_calc.py`)
 
 - **Car baseline emission:** `0.17 kg CO2 / km`.
 - **CO2 saved:**
@@ -41,12 +43,27 @@ The application helps users manage daily commute routes, track environmental and
   - `bike` / `walk`: `0.17 * distance_km kg`
 - **Calories burned:** `bike` -> `32 kcal/km`, `walk` -> `55 kcal/km`, others -> `0 kcal`.
 
+#### 2. Weather Resilience (`services/weather.py`)
+
+- Live Open-Meteo API query by coordinates.
+- **Offline Graceful Fallback:** If Open-Meteo is unreachable or times out, seamlessly supply synthetic fair weather (18°C, mild clouds, 12 km/h wind) with zero 500 errors.
+
+#### 3. AI Advisor Decision Matrix (`services/ai_advisor.py`)
+
+- **Rain (`rain` or precipitation > 0.5 mm):** Discourage bike/walk. If `distance_km > 4.0` -> `public_transit` or `car`; if `distance_km <= 4.0` -> `public_transit`.
+- **Freezing Cold (`cold` or temperature < 0°C):** Recommend `public_transit` or `car` with thermal comfort rationale.
+- **Strong Wind (`windy` or wind speed > 35 km/h):** Warn against biking, prefer `public_transit`.
+- **Fair Weather (10°C to 25°C, no rain):**
+  - `distance_km <= 2.5` -> `walk` (maximum calorie burn + 100% emission reduction).
+  - `2.5 < distance_km <= 10.0` -> `bike` (efficient travel time + zero emissions).
+  - `distance_km > 10.0` -> `public_transit` or route preferred transport.
+
 ### REST API Endpoints
 
 - `GET /api/routes` – Returns list of routes (auto-seeds 3 routes and 4 commute logs on initial startup if empty).
 - `POST /api/routes` – Creates a new route.
 - `PUT /api/routes/{id}` – Updates an existing route.
-- `DELETE /api/routes/{id}` – Deletes a route.
+- `DELETE /api/routes/{id}` – Deletes a route (cascades to logs).
 - `GET /api/commutes` – Returns commute history and aggregated statistics (`total_co2_saved_kg`, `total_calories`, `trips_count`).
 - `POST /api/commutes` – Records an actual commute and recalculates CO2 savings and burned calories.
 - `POST /api/routes/{id}/ai-recommend` – **Creative Twist:**
@@ -74,7 +91,8 @@ The application helps users manage daily commute routes, track environmental and
    - `bike`: `<Bike />` with `bg-emerald-50 text-emerald-700` (zero emission + active).
    - `walk`: `<Footprints />` with `bg-teal-50 text-teal-700` (zero emission + maximum calories).
 
-3. **Dashboard Layout Architecture:**
+3. **Dashboard Layout & State Management:**
+   - **State Architecture:** Lightweight React custom hooks (`useRoutes`, `useCommutes`, `useAIAdvisor`) modeled with Discriminated Unions (`AsyncState<T>`) — zero external state library bloat.
    - **Header:** Branding with quick summary pills (Total CO2 saved, total calories burned, trips count).
    - **AI Advisor Hero Card ("How should I commute today?"):**
      - Live weather indicator from Open-Meteo.
@@ -113,14 +131,16 @@ Aplikacja pomaga użytkownikom zarządzać codziennymi trasami dojazdów, śledz
 
 2. **`CommuteLog` (Dziennik odbytych przejazdów):**
    - `id`: int (Primary Key)
-   - `route_id`: int (Foreign Key -> `Route.id`, `ondelete="CASCADE"`)
+   - `route_id`: int (Foreign Key -> `Route.id`, `ondelete="CASCADE"`: usunięcie trasy czyści jej powiązane przejazdy w ramach przewidywalnego cyklu życia MVP)
    - `transport_mode`: Literal["car", "bike", "public_transit", "walk"]
    - `duration_minutes`: int (`> 0`)
    - `co2_saved_kg`: float (wyliczane względem bazowej emisji auta 0.17 kg/km)
    - `calories_burned`: int (wyliczane automatycznie dla roweru i marszu)
    - `logged_at`: datetime
 
-### Logika Domenowa (`services/eco_calc.py`)
+### Logika Domenowa i Matryca Decyzyjna (`services/`)
+
+#### 1. Kalkulacje ekologiczne (`services/eco_calc.py`)
 
 - **Emisja bazowa samochodu:** `0.17 kg CO2 / km`.
 - **Zaoszczędzone $CO_2$:**
@@ -129,12 +149,27 @@ Aplikacja pomaga użytkownikom zarządzać codziennymi trasami dojazdów, śledz
   - `bike` / `walk`: `0.17 * distance_km kg`
 - **Spalone kalorie:** `bike` -> `32 kcal/km`, `walk` -> `55 kcal/km`, pozostałe -> `0 kcal`.
 
+#### 2. Odporność klienta pogody na brak sieci (`services/weather.py`)
+
+- Zapytania na żywo do API Open-Meteo według współrzędnych.
+- **Offline Graceful Fallback:** W razie braku połączenia internetowego lub timeoutu serwis bezbłędnie zwraca syntetyczną pogodę bazową (18°C, umiarkowane zachmurzenie, wiatr 12 km/h), eliminując ryzyko błędów HTTP 500.
+
+#### 3. Matryca Decyzyjna Doradcy AI (`services/ai_advisor.py`)
+
+- **Deszcz (`rain` lub opady > 0.5 mm):** Odradzamy rower i marsz. Gdy `distance_km > 4.0` -> `public_transit` lub `car`; gdy `distance_km <= 4.0` -> `public_transit`.
+- **Mróz (`cold` lub temperatura < 0°C):** Sugerujemy `public_transit` lub `car` z uzasadnieniem o komforcie termicznym.
+- **Silny wiatr (`windy` lub wiatr > 35 km/h):** Ostrzeżenie przed rowerem, preferencja dla `public_transit`.
+- **Dobra pogoda (10°C do 25°C, brak deszczu):**
+  - `distance_km <= 2.5` -> `walk` (maksymalne kalorie + 100% redukcji emisji).
+  - `2.5 < distance_km <= 10.0` -> `bike` (szybki dojazd + zero emisji).
+  - `distance_km > 10.0` -> `public_transit` lub preferowany transport użytkownika.
+
 ### Endpointy REST API
 
 - `GET /api/routes` – Pobiera listę tras (przy pustej bazie przy starcie seedowane są 3 gotowe trasy i 4 historyczne przejazdy).
 - `POST /api/routes` – Dodaje nową trasę.
 - `PUT /api/routes/{id}` – Edytuje istniejącą trasę.
-- `DELETE /api/routes/{id}` – Usuwa trasę.
+- `DELETE /api/routes/{id}` – Usuwa trasę (kaskadowo z logami).
 - `GET /api/commutes` – Pobiera historię przejazdów oraz zagregowane statystyki (`total_co2_saved_kg`, `total_calories`, `trips_count`).
 - `POST /api/commutes` – Zapisuje odbyty przejazd i automatycznie przelicza oszczędności $CO_2$ oraz kalorie.
 - `POST /api/routes/{id}/ai-recommend` – **Creative Twist:**
@@ -162,7 +197,8 @@ Aplikacja pomaga użytkownikom zarządzać codziennymi trasami dojazdów, śledz
    - `bike`: `<Bike />` z `bg-emerald-50 text-emerald-700` (zero emisji + aktywne kalorie).
    - `walk`: `<Footprints />` z `bg-teal-50 text-teal-700` (zero emisji + najwyższe spalanie).
 
-3. **Architektura Dashboardu:**
+3. **Architektura Dashboardu i Zarządzanie Stanem:**
+   - **Architektura stanu:** Lekkie custom hooki React (`useRoutes`, `useCommutes`, `useAIAdvisor`) oparte o Unie Dyskryminowane (`AsyncState<T>`) bez narzutu zewnętrznych bibliotek stanu.
    - **Header:** Logo z pigułkami szybkich statystyk globalnych (Suma CO2, Spalone kalorie, Liczba tras).
    - **Karta Hero Asystenta AI („Czym dziś jechać?”):**
      - Wskaźnik bieżącej pogody z Open-Meteo.
