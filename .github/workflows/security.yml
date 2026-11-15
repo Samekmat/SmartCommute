@@ -102,14 +102,14 @@ jobs:
 
       - name: Lint Backend Dockerfile (Hadolint)
         if: hashFiles('backend/Dockerfile') != ''
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: backend/Dockerfile
           failure-threshold: warning
 
       - name: Lint Frontend Dockerfile (Hadolint)
         if: hashFiles('frontend/Dockerfile') != ''
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: frontend/Dockerfile
           failure-threshold: warning
