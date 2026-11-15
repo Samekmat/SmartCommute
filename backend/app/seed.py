@@ -1,3 +1,5 @@
+"""Automated database seeding with sample routes and historical commute logs."""
+
 from datetime import UTC, datetime, timedelta
 
 from sqlmodel import Session, select
@@ -6,12 +8,15 @@ from app.models import CommuteLog, Route
 
 
 def seed_database(session: Session) -> None:
-    # Check if database already contains routes (idempotency check)
+    """Populate database with sample routes and logs if the route table is empty.
+
+    Ensures zero-config onboarding on first run while maintaining idempotency
+    across subsequent application restarts.
+    """
     existing_route = session.exec(select(Route)).first()
     if existing_route is not None:
         return
 
-    # Seed 3 sample routes
     route_1 = Route(
         name="Dom -> Biuro",
         origin="Krowodrza",
@@ -51,7 +56,10 @@ def seed_database(session: Session) -> None:
 
     now = datetime.now(UTC)
 
-    # Seed 4 commute logs
+    # Historical commute logs with pre-calculated baseline eco metrics:
+    # - bike: 0.17 kg CO2/km saved, 32 kcal/km
+    # - public transit: 0.13 kg CO2/km saved, 0 kcal/km
+    # - walk: 0.17 kg CO2/km saved, 55 kcal/km
     logs = [
         CommuteLog(
             route_id=route_1.id,  # type: ignore[arg-type]

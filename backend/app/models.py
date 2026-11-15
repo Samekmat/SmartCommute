@@ -1,3 +1,5 @@
+"""Domain entities and SQLModel table definitions for SmartCommute."""
+
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -10,6 +12,8 @@ CANONICAL_TRANSPORT_MODES: set[str] = {"car", "bike", "public_transit", "walk"}
 
 
 class Route(SQLModel, table=True):
+    """Predefined commute route with origin, destination, and geo-coordinates."""
+
     __tablename__ = "route"
     __table_args__ = (
         CheckConstraint("distance_km > 0", name="check_route_distance_km_gt_zero"),
@@ -33,12 +37,14 @@ class Route(SQLModel, table=True):
 
     @validates("distance_km")
     def validate_distance_km(self, key: str, value: float) -> float:
+        """Ensure route distance is strictly positive."""
         if value <= 0:
             raise ValueError("distance_km must be greater than 0")
         return value
 
     @validates("preferred_transport")
     def validate_preferred_transport(self, key: str, value: str) -> str:
+        """Ensure preferred transport matches canonical domain modes."""
         if value not in CANONICAL_TRANSPORT_MODES:
             raise ValueError(
                 f"preferred_transport must be one of {CANONICAL_TRANSPORT_MODES}"
@@ -47,6 +53,8 @@ class Route(SQLModel, table=True):
 
 
 class CommuteLog(SQLModel, table=True):
+    """Historical record of an actual commute taken along a predefined route."""
+
     __tablename__ = "commute_log"
     __table_args__ = (
         CheckConstraint(
@@ -69,12 +77,14 @@ class CommuteLog(SQLModel, table=True):
 
     @validates("duration_minutes")
     def validate_duration_minutes(self, key: str, value: int) -> int:
+        """Ensure commute duration is strictly positive."""
         if value <= 0:
             raise ValueError("duration_minutes must be greater than 0")
         return value
 
     @validates("transport_mode")
     def validate_transport_mode(self, key: str, value: str) -> str:
+        """Ensure recorded transport mode matches canonical domain modes."""
         if value not in CANONICAL_TRANSPORT_MODES:
             raise ValueError(
                 f"transport_mode must be one of {CANONICAL_TRANSPORT_MODES}"
