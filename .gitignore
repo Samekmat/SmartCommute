@@ -46,6 +46,7 @@ pnpm-debug.log*
 lerna-debug.log*
 frontend/dist/
 frontend/dist-ssr/
+*.tsbuildinfo
 *.local
 
 # IDE & OS
