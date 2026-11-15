@@ -34,7 +34,8 @@ This project is a Full-Stack MVP (**Python FastAPI + React TypeScript**) built w
 ### 3. Creative Twist & Zero-Config Reliability
 
 - The `POST /api/routes/{id}/ai-recommend` endpoint merges route metrics with weather data from the free **Open-Meteo API** (or an optional weather simulator passed from the UI for demo purposes).
-- **Zero-Config Fallback (Crucial for recruiters):** When `OPENAI_API_KEY` is not present in the environment, `ai_advisor.py` seamlessly switches to a deterministic heuristic recommendation engine returning an identical JSON response structure. The application must run 100% out-of-the-box without requiring API keys.
+- **Multi-Provider Support:** Supports Google Gemini (`gemini-3.5-flash-lite`, default free tier), OpenAI (`gpt-4o-mini`), and Anthropic Claude (`claude-3-5-haiku-20241022`) with runtime model selection.
+- **Zero-Config Fallback (Crucial for recruiters):** When no external LLM API key (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) is present in the environment, `ai_advisor.py` seamlessly switches to a deterministic heuristic recommendation engine returning an identical JSON response structure. The application must run 100% out-of-the-box without requiring API keys.
 
 ### 4. Git & Commit Hygiene (Conventional Commits)
 
@@ -101,7 +102,8 @@ Ten projekt to Full-Stack MVP (**Python FastAPI + React TypeScript**) realizowan
 ### 3. Creative Twist & Niezawodność Zero-Config
 
 - Endpoint `POST /api/routes/{id}/ai-recommend` łączy dane o trasie z pogodą z darmowego **Open-Meteo API** (lub opcjonalnym symulatorem pogody przekazanym z UI do celów demonstracyjnych).
-- **Zero-Config Fallback (Krytyczne dla rekrutera):** Jeśli w środowisku brakuje `OPENAI_API_KEY`, serwis `ai_advisor.py` musi płynnie przełączyć się na deterministyczny silnik rekomendacji kontekstowej, zwracając identyczną strukturę JSON. Aplikacja musi działać w 100% od razu po uruchomieniu bez konfigurowania kluczy API.
+- **Obsługa wielu dostawców AI (Multi-Provider):** Wspiera Google Gemini (`gemini-3.5-flash-lite`, domyślny darmowy tier), OpenAI (`gpt-4o-mini`) oraz Anthropic Claude (`claude-3-5-haiku-20241022`) z możliwością wyboru dostawcy.
+- **Zero-Config Fallback (Krytyczne dla rekrutera):** Jeśli w środowisku brakuje kluczy API (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`), serwis `ai_advisor.py` musi płynnie przełączyć się na deterministyczny silnik rekomendacji kontekstowej, zwracając identyczną strukturę JSON. Aplikacja musi działać w 100% od razu po uruchomieniu bez konfigurowania kluczy API.
 
 ### 4. Higiena Git i commitów (Conventional Commits)
 

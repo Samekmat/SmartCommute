@@ -35,8 +35,16 @@ An interactive testing control allowing evaluation of transport recommendations 
 _Avoid_: Weather override, mock weather, forecast tester
 
 **Zero-Config Fallback**:
-A deterministic rule engine that provides complete AI Advisor recommendations without crashing or failing when external LLM credentials (`OPENAI_API_KEY`) are omitted.
+A deterministic rule engine that provides complete AI Advisor recommendations without crashing or failing when external LLM credentials (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are omitted.
 _Avoid_: Offline mode, dummy advisor, mock response
+
+**Multi-Provider AI**:
+An AI architecture supporting multiple LLM backends (Google Gemini, OpenAI GPT, Anthropic Claude) with seamless fallback to deterministic heuristic rules.
+_Avoid_: Dual engine, multi-bot, AI switcher
+
+**Geocoding & Location Search**:
+The subsystem using OpenStreetMap Nominatim with Kraków proximity biasing and the Haversine distance formula to resolve addresses and calculate route distances.
+_Avoid_: Map search, address finder, GPS lookup
 
 ---
 
@@ -73,5 +81,13 @@ Interaktywny panel testowy umożliwiający weryfikację rekomendacji transportow
 _Unikaj_: Nadpisanie pogody, mock pogody, tester prognozy
 
 **Fallback Zero-Config (Zero-Config Fallback)**:
-Deterministyczny silnik regułowy dostarczający kompletne rekomendacje Doradcy AI bez zgłaszania błędów w przypadku braku zewnętrznego klucza API (`OPENAI_API_KEY`).
+Deterministyczny silnik regułowy dostarczający kompletne rekomendacje Doradcy AI bez zgłaszania błędów w przypadku braku jakichkolwiek kluczy API (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`).
 _Unikaj_: Tryb offline, atrapa AI, pusta odpowiedź
+
+**Wielomodelowe AI (Multi-Provider AI)**:
+Architektura modułu doradczego wspierająca wielu dostawców modeli LLM (Google Gemini, OpenAI GPT, Anthropic Claude) z automatycznym fallbackiem do deterministycznej matrycy heurystycznej.
+_Unikaj_: Podwójny silnik, multi-bot, przełącznik AI
+
+**Geokodowanie i wyszukiwanie lokalizacji (Geocoding & Location Search)**:
+Podsystem oparty o OpenStreetMap Nominatim z faworyzacją Krakowa i wzorem Haversine do wyszukiwania adresów, wykrywania pozycji GPS i automatycznego wyliczania dystansu trasy.
+_Unikaj_: Szukajka mapy, wyszukiwarka adresów, wykrywanie GPS

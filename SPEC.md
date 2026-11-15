@@ -48,15 +48,23 @@ The application helps users manage daily commute routes, track environmental and
 - Live Open-Meteo API query by coordinates.
 - **Offline Graceful Fallback:** If Open-Meteo is unreachable or times out, seamlessly supply synthetic fair weather (18°C, mild clouds, 12 km/h wind) with zero 500 errors.
 
-#### 3. AI Advisor Decision Matrix (`services/ai_advisor.py`)
+#### 3. AI Advisor Decision Matrix & Multi-Provider Engine (`services/ai_advisor.py`)
 
-- **Rain (`rain` or precipitation > 0.5 mm):** Discourage bike/walk. If `distance_km > 4.0` -> `public_transit` or `car`; if `distance_km <= 4.0` -> `public_transit`.
-- **Freezing Cold (`cold` or temperature < 0°C):** Recommend `public_transit` or `car` with thermal comfort rationale.
-- **Strong Wind (`windy` or wind speed > 35 km/h):** Warn against biking, prefer `public_transit`.
-- **Fair Weather (10°C to 25°C, no rain):**
-  - `distance_km <= 2.5` -> `walk` (maximum calorie burn + 100% emission reduction).
-  - `2.5 < distance_km <= 10.0` -> `bike` (efficient travel time + zero emissions).
-  - `distance_km > 10.0` -> `public_transit` or route preferred transport.
+- **Multi-Provider LLM Engine:** Supports Google Gemini (`gemini-3.5-flash-lite`, default in auto), OpenAI (`gpt-4o-mini`), and Anthropic Claude (`claude-3-5-haiku-20241022`) with runtime selection and in-app credential storage.
+- **Heuristic Decision Matrix (Zero-Config Fallback):**
+  - **Rain (`rain` or precipitation > 0.5 mm):** Discourage bike/walk. If `distance_km > 4.0` -> `public_transit` or `car`; if `distance_km <= 4.0` -> `public_transit`.
+  - **Freezing Cold (`cold` or temperature < 0°C):** Recommend `public_transit` or `car` with thermal comfort rationale.
+  - **Strong Wind (`windy` or wind speed > 35 km/h):** Warn against biking, prefer `public_transit`.
+  - **Fair Weather (10°C to 25°C, no rain):**
+    - `distance_km <= 2.5` -> `walk` (maximum calorie burn + 100% emission reduction).
+    - `2.5 < distance_km <= 10.0` -> `bike` (efficient travel time + zero emissions).
+    - `distance_km > 10.0` -> `public_transit` or route preferred transport.
+
+#### 4. Geocoding & Distance Calculation (`services/geocoding.py`)
+
+- **OpenStreetMap Nominatim Geocoding:** Searches location candidates by text with Kraków bounding box and proximity biasing.
+- **Reverse Geocoding:** Translates latitude/longitude coordinates into human-readable street or locality addresses.
+- **Automatic Distance Calculation:** Computes great-circle distance between origin and destination coordinates using the Haversine formula, automatically populating the `distance_km` field in route modals.
 
 ### REST API Endpoints
 
@@ -67,16 +75,21 @@ The application helps users manage daily commute routes, track environmental and
 - `GET /api/commutes` – Returns commute history and aggregated statistics (`total_co2_saved_kg`, `total_calories`, `trips_count`).
 - `POST /api/commutes` – Records an actual commute and recalculates CO2 savings and burned calories.
 - `POST /api/routes/{id}/ai-recommend` – **Creative Twist:**
-  - Optional body: `{ "weather_override": "rain" | "sunny" | "windy" | "cold" | null }` (enables instant recruiter testing of diverse weather conditions).
-  - Fetches real-time weather from Open-Meteo (temperature, precipitation, wind speed) for route coordinates.
+  - Request body: `{ "weather_override": "rain" | "sunny" | "windy" | "cold" | null, "provider": "auto" | "gemini" | "openai" | "claude" | null, "api_key": str | null }`.
+  - Fetches real-time weather from Open-Meteo for route coordinates.
   - Returns structured AI recommendation:
     - `recommended_mode`: `"car" | "bike" | "public_transit" | "walk"`
     - `weather_summary`: str (e.g. "8°C, light rain, wind 24 km/h")
-    - `reasoning`: str (contextual justification)
+    - `reasoning`: str (contextual justification in Polish)
     - `estimated_duration_min`: int
     - `potential_co2_saved_kg`: float
     - `calories_estimate`: int
-    - `ai_source`: `"llm" | "heuristic_fallback"`
+    - `ai_source`: `"llm" | "gemini" | "openai" | "claude" | "heuristic_fallback"`
+    - `provider`: str | null
+- `GET /api/ai/status` – Inspects environment configuration and returns boolean presence of `gemini`, `openai`, `claude` keys and `active_default`.
+- `POST /api/ai/config` – Registers or persists an API key for a selected provider into the local `.env` file.
+- `GET /api/geocoding/search` – Queries OpenStreetMap Nominatim for location suggestions (`q`, `count`).
+- `GET /api/geocoding/reverse` – Resolves human-readable address from coordinates (`latitude`, `longitude`).
 
 ### Presentation Layer & UI/UX Design System
 
@@ -154,15 +167,23 @@ Aplikacja pomaga użytkownikom zarządzać codziennymi trasami dojazdów, śledz
 - Zapytania na żywo do API Open-Meteo według współrzędnych.
 - **Offline Graceful Fallback:** W razie braku połączenia internetowego lub timeoutu serwis bezbłędnie zwraca syntetyczną pogodę bazową (18°C, umiarkowane zachmurzenie, wiatr 12 km/h), eliminując ryzyko błędów HTTP 500.
 
-#### 3. Matryca Decyzyjna Doradcy AI (`services/ai_advisor.py`)
+#### 3. Matryca Decyzyjna i Silnik Wielomodelowy AI (`services/ai_advisor.py`)
 
-- **Deszcz (`rain` lub opady > 0.5 mm):** Odradzamy rower i marsz. Gdy `distance_km > 4.0` -> `public_transit` lub `car`; gdy `distance_km <= 4.0` -> `public_transit`.
-- **Mróz (`cold` lub temperatura < 0°C):** Sugerujemy `public_transit` lub `car` z uzasadnieniem o komforcie termicznym.
-- **Silny wiatr (`windy` lub wiatr > 35 km/h):** Ostrzeżenie przed rowerem, preferencja dla `public_transit`.
-- **Dobra pogoda (10°C do 25°C, brak deszczu):**
-  - `distance_km <= 2.5` -> `walk` (maksymalne kalorie + 100% redukcji emisji).
-  - `2.5 < distance_km <= 10.0` -> `bike` (szybki dojazd + zero emisji).
-  - `distance_km > 10.0` -> `public_transit` lub preferowany transport użytkownika.
+- **Silnik Multi-Provider LLM:** Obsługa modeli Google Gemini (`gemini-3.5-flash-lite`, domyślny darmowy tier), OpenAI (`gpt-4o-mini`) oraz Anthropic Claude (`claude-3-5-haiku-20241022`) z wyborem dostawcy i zapisem kluczy w aplikacji.
+- **Deterministyczna matryca decyzyjna (Fallback Zero-Config):**
+  - **Deszcz (`rain` lub opady > 0.5 mm):** Odradzamy rower i marsz. Gdy `distance_km > 4.0` -> `public_transit` lub `car`; gdy `distance_km <= 4.0` -> `public_transit`.
+  - **Mróz (`cold` lub temperatura < 0°C):** Sugerujemy `public_transit` lub `car` z uzasadnieniem o komforcie termicznym.
+  - **Silny wiatr (`windy` lub wiatr > 35 km/h):** Ostrzeżenie przed rowerem, preferencja dla `public_transit`.
+  - **Dobra pogoda (10°C do 25°C, brak deszczu):**
+    - `distance_km <= 2.5` -> `walk` (maksymalne kalorie + 100% redukcji emisji).
+    - `2.5 < distance_km <= 10.0` -> `bike` (szybki dojazd + zero emisji).
+    - `distance_km > 10.0` -> `public_transit` lub preferowany transport użytkownika.
+
+#### 4. Geokodowanie i automatyczne obliczanie odległości (`services/geocoding.py`)
+
+- **Wyszukiwanie OpenStreetMap Nominatim:** Wyszukiwanie propozycji adresowych z faworyzacją obszaru Krakowa.
+- **Odwrotne geokodowanie (Reverse Geocoding):** Tłumaczenie współrzędnych GPS na czytelny adres ulicy lub miejscowości.
+- **Automatyczna kalkulacja dystansu:** Obliczanie odległości między punktem startowym a docelowym według wzoru Haversine i automatyczne wypełnianie pola `distance_km`.
 
 ### Endpointy REST API
 
@@ -173,7 +194,7 @@ Aplikacja pomaga użytkownikom zarządzać codziennymi trasami dojazdów, śledz
 - `GET /api/commutes` – Pobiera historię przejazdów oraz zagregowane statystyki (`total_co2_saved_kg`, `total_calories`, `trips_count`).
 - `POST /api/commutes` – Zapisuje odbyty przejazd i automatycznie przelicza oszczędności $CO_2$ oraz kalorie.
 - `POST /api/routes/{id}/ai-recommend` – **Creative Twist:**
-  - Opcjonalne body: `{ "weather_override": "rain" | "sunny" | "windy" | "cold" | null }` (pozwala rekruterowi przetestować różne scenariusze pogodowe jednym kliknięciem w UI!).
+  - Ciało żądania: `{ "weather_override": "rain" | "sunny" | "windy" | "cold" | null, "provider": "auto" | "gemini" | "openai" | "claude" | null, "api_key": str | null }`.
   - Pobiera aktualną pogodę z Open-Meteo (temperatura, opady, wiatr) dla współrzędnych trasy.
   - Zwraca ustrukturyzowaną rekomendację AI:
     - `recommended_mode`: `"car" | "bike" | "public_transit" | "walk"`
@@ -182,7 +203,12 @@ Aplikacja pomaga użytkownikom zarządzać codziennymi trasami dojazdów, śledz
     - `estimated_duration_min`: int
     - `potential_co2_saved_kg`: float
     - `calories_estimate`: int
-    - `ai_source`: `"llm" | "heuristic_fallback"`
+    - `ai_source`: `"llm" | "gemini" | "openai" | "claude" | "heuristic_fallback"`
+    - `provider`: str | null
+- `GET /api/ai/status` – Sprawdza konfigurację środowiska i zwraca obecność kluczy `gemini`, `openai`, `claude` oraz domyślnego providera.
+- `POST /api/ai/config` – Rejestruje lub zapisuje klucz API wybranego dostawcy w lokalnym pliku `.env`.
+- `GET /api/geocoding/search` – Wyszukuje lokalizacje w OpenStreetMap Nominatim (`q`, `count`).
+- `GET /api/geocoding/reverse` – Tłumaczy współrzędne geograficzne (`latitude`, `longitude`) na czytelny adres.
 
 ### Warstwa Prezentacji i Wytyczne UI/UX
 
