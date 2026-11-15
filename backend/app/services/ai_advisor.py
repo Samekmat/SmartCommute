@@ -34,22 +34,21 @@ class AIRecommendation:
 
 def _estimate_duration_minutes(mode: TransportMode, distance_km: float) -> int:
     """Estimate commute duration based on transport mode and distance."""
-    match mode:
-        case "walk":
-            # Average walking speed ~4.8 km/h
-            return max(1, round(distance_km / 4.8 * 60))
-        case "bike":
-            # Average city cycling speed ~16 km/h
-            return max(1, round(distance_km / 16.0 * 60))
-        case "public_transit":
-            # Average transit speed ~22 km/h plus 5-min waiting buffer
-            return max(5, round(distance_km / 22.0 * 60) + 5)
-        case "car":
-            # Urban traffic ~35 km/h plus 3-min parking/setup
-            return max(3, round(distance_km / 35.0 * 60) + 3)
-        case _:
-            # Fallback estimation for unexpected transport mode (~20 km/h)
-            return max(1, round(distance_km / 20.0 * 60))
+    if mode == "walk":
+        # Average walking speed ~4.8 km/h
+        return max(1, round(distance_km / 4.8 * 60))
+    if mode == "bike":
+        # Average city cycling speed ~16 km/h
+        return max(1, round(distance_km / 16.0 * 60))
+    if mode == "public_transit":
+        # Average transit speed ~22 km/h plus 5-min waiting buffer
+        return max(5, round(distance_km / 22.0 * 60) + 5)
+    if mode == "car":
+        # Urban traffic ~35 km/h plus 3-min parking/setup
+        return max(3, round(distance_km / 35.0 * 60) + 3)
+
+    # Fallback estimation for unexpected transport mode (~20 km/h)
+    return max(1, round(distance_km / 20.0 * 60))
 
 
 def _heuristic_recommendation(route: Route, weather: WeatherData) -> AIRecommendation:
