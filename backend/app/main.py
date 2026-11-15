@@ -7,9 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 
+from app.config import load_env_file
 from app.database import engine, init_db
 from app.routers import commutes, routes
 from app.seed import seed_database
+
+# Load .env file if present
+load_env_file()
 
 
 @asynccontextmanager

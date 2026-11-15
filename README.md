@@ -26,7 +26,31 @@ _(Demo GIF/MP4 preview placeholder)_
 
 ### Local Setup & Quick Start
 
-#### 1. Backend (FastAPI)
+#### One-Command / Single-File Start (Recommended)
+
+Run both backend and frontend simultaneously with a single command from the project root:
+
+```bash
+# Optional: copy .env.example to .env in project root and provide OPENAI_API_KEY (fallback works out-of-the-box without it)
+# Using Python runner directly
+python run.py
+
+# Or using npm
+npm run dev
+
+# On Windows: you can also double-click start.bat or run:
+.\start.ps1
+
+# On Linux / macOS:
+./start.sh
+```
+
+- **Frontend Web App:** `http://localhost:5173`
+- **Interactive Swagger Docs:** `http://localhost:8000/docs`
+
+#### Individual Service Setup
+
+##### 1. Backend (FastAPI)
 
 Using `uv` (recommended):
 
@@ -85,7 +109,31 @@ _(Miejsce na nagranie GIF/MP4 pokazujące działanie aplikacji)_
 
 ### Jak uruchomić projekt lokalnie
 
-#### 1. Uruchomienie Backendu (FastAPI)
+#### Uruchomienie jednym plikiem / jednym poleceniem (Zalecane)
+
+Uruchom backend i frontend jednocześnie za pomocą jednego polecenia z głównego katalogu:
+
+```bash
+# Opcjonalnie: skopiuj .env.example do .env w katalogu głównym i uzupełnij OPENAI_API_KEY (bez klucza działa tryb fallback)
+# Bezpośrednio skryptem Python
+python run.py
+
+# Lub przez npm
+npm run dev
+
+# Na Windowsie: możesz również dwukliknąć start.bat lub uruchomić:
+.\start.ps1
+
+# Na Linuxie / macOS:
+./start.sh
+```
+
+- **Aplikacja Frontend:** `http://localhost:5173`
+- **Interaktywna dokumentacja Swagger:** `http://localhost:8000/docs`
+
+#### Uruchamianie serwisów osobno
+
+##### 1. Uruchomienie Backendu (FastAPI)
 
 Zalecane uruchomienie z użyciem menedżera `uv` (lub standardowego `pip`):
 

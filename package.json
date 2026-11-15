@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "start": "python run.py",
+    "dev": "python run.py"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
