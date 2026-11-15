@@ -146,7 +146,9 @@ export function RouteModal({
       (!originCoords || (latitude === "50.0647" && longitude === "19.9450"))
     ) {
       try {
-        const results = await api.searchLocations(trimmed, 1);
+        const refLat = originCoords?.latitude ?? Number(latitude);
+        const refLon = originCoords?.longitude ?? Number(longitude);
+        const results = await api.searchLocations(trimmed, 1, refLat, refLon);
         if (results.length > 0 && results[0]) {
           const item = results[0];
           const newOrig: Coordinates = {
@@ -181,7 +183,9 @@ export function RouteModal({
     const trimmed = destination.trim();
     if (trimmed.length >= 3 && !destCoords) {
       try {
-        const results = await api.searchLocations(trimmed, 1);
+        const refLat = originCoords?.latitude ?? Number(latitude);
+        const refLon = originCoords?.longitude ?? Number(longitude);
+        const results = await api.searchLocations(trimmed, 1, refLat, refLon);
         if (results.length > 0 && results[0]) {
           const item = results[0];
           const newDest: Coordinates = {
@@ -216,7 +220,9 @@ export function RouteModal({
     try {
       setIsSearchingGeo(true);
       setGeoNotice(null);
-      const results = await api.searchLocations(text, 5);
+      const refLat = originCoords?.latitude ?? Number(latitude);
+      const refLon = originCoords?.longitude ?? Number(longitude);
+      const results = await api.searchLocations(text, 5, refLat, refLon);
       if (results.length === 0) {
         setGeoNotice(`Nie znaleziono współrzędnych dla zapytania: "${text}".`);
         setGeoResults([]);

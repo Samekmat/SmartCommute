@@ -14,22 +14,23 @@ from fastapi.testclient import TestClient
 
 @pytest.mark.asyncio
 async def test_search_locations_success(monkeypatch: pytest.MonkeyPatch):
-    """search_locations parses Open-Meteo geocoding response into LocationItems."""
-    mock_response = {
-        "results": [
-            {
-                "id": 1,
-                "name": "Kraków",
-                "latitude": 50.0614,
-                "longitude": 19.9366,
+    """search_locations parses Nominatim geocoding response into LocationItems."""
+    mock_response = [
+        {
+            "name": "Kraków",
+            "lat": "50.0614",
+            "lon": "19.9366",
+            "display_name": "Kraków, województwo małopolskie, Polska",
+            "address": {
                 "country": "Polska",
-                "admin1": "Województwo małopolskie",
-            }
-        ]
-    }
+                "state": "województwo małopolskie",
+            },
+        }
+    ]
 
     async def mock_handler(request: httpx.Request) -> httpx.Response:
-        assert "geocoding-api.open-meteo.com" in str(request.url)
+        assert "nominatim.openstreetmap.org" in str(request.url)
+        assert "q=Krakow" in str(request.url) or "q=Krak%C3%B3w" in str(request.url)
         return httpx.Response(200, json=mock_response)
 
     real_async_client = httpx.AsyncClient
@@ -106,20 +107,22 @@ def test_api_geocoding_endpoints(monkeypatch: pytest.MonkeyPatch):
     """Integration test for /api/geocoding/search and /api/geocoding/reverse."""
 
     async def mock_search_handler(request: httpx.Request) -> httpx.Response:
-        if "geocoding-api.open-meteo.com" in str(request.url):
+        url_str = str(request.url)
+        if "/search" in url_str:
             return httpx.Response(
                 200,
-                json={
-                    "results": [
-                        {
-                            "name": "Wrocław",
-                            "latitude": 51.1079,
-                            "longitude": 17.0385,
+                json=[
+                    {
+                        "name": "Wrocław",
+                        "lat": "51.1079",
+                        "lon": "17.0385",
+                        "display_name": "Wrocław, Dolnośląskie, Polska",
+                        "address": {
                             "country": "Polska",
-                            "admin1": "Dolnośląskie",
-                        }
-                    ]
-                },
+                            "state": "Dolnośląskie",
+                        },
+                    }
+                ],
             )
         return httpx.Response(
             200,

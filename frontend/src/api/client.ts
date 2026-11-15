@@ -298,20 +298,31 @@ export function createApiClient(
     },
 
     /**
-     * Search geographic places by text query.
+     * Search geographic places by text query using Nominatim geocoding.
+     * Optionally biases results towards reference coordinates (e.g. current route city or GPS).
      *
      * @param query - Address or place text.
      * @param count - Max results (default: 5).
+     * @param latitude - Optional reference latitude for proximity biasing.
+     * @param longitude - Optional reference longitude for proximity biasing.
      * @returns List of validated matching locations with coordinates.
      */
     async searchLocations(
       query: string,
-      count: number = 5
+      count: number = 5,
+      latitude?: number,
+      longitude?: number
     ): Promise<LocationSearchResult[]> {
       const params = new URLSearchParams({
         q: query,
         count: count.toString(),
       });
+      if (latitude !== undefined && !Number.isNaN(latitude)) {
+        params.set("latitude", latitude.toString());
+      }
+      if (longitude !== undefined && !Number.isNaN(longitude)) {
+        params.set("longitude", longitude.toString());
+      }
       const raw = await requestRaw(
         `/api/geocoding/search?${params.toString()}`,
         {

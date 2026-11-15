@@ -1,4 +1,4 @@
-"""Geocoding and reverse geocoding service using Open-Meteo and OpenStreetMap."""
+"""Geocoding and reverse geocoding service using OpenStreetMap Nominatim."""
 
 import logging
 from dataclasses import dataclass
@@ -8,7 +8,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-OPEN_METEO_GEOCODING_URL: Final[str] = "https://geocoding-api.open-meteo.com/v1/search"
+NOMINATIM_SEARCH_URL: Final[str] = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_REVERSE_URL: Final[str] = "https://nominatim.openstreetmap.org/reverse"
 NOMINATIM_USER_AGENT: Final[str] = "SmartCommute/1.0 (contact: samekmat@gmail.com)"
 
@@ -35,55 +35,76 @@ class ReverseGeocodeItem:
     longitude: float
 
 
-async def search_locations(query: str, count: int = 5) -> list[LocationItem]:
-    """Search geographic locations by text query using Open-Meteo Geocoding API.
+async def search_locations(
+    query: str,
+    count: int = 5,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> list[LocationItem]:
+    """Search geographic locations by text query using OpenStreetMap Nominatim.
+
+    Supports street addresses, squares, POIs, districts, and cities.
+    Optionally applies proximity biasing around reference coordinates.
 
     Parameters
     ----------
     query : str
-        Search query string (e.g. city name, district, address).
+        Search query string (e.g. city, district, address, square).
     count : int
         Maximum number of matching candidates to return.
+    latitude : float | None
+        Optional reference latitude for proximity biasing.
+    longitude : float | None
+        Optional reference longitude for proximity biasing.
 
     Returns
     -------
     list[LocationItem]
-        List of candidate locations with latitude and longitude.
+        List of candidate locations with coordinates and administrative hierarchy.
     """
     clean_query = query.strip()
     if not clean_query:
         return []
 
-    params = {
-        "name": clean_query,
-        "count": count,
-        "language": "pl",
+    params: dict[str, str | int] = {
+        "q": clean_query,
         "format": "json",
+        "addressdetails": 1,
+        "limit": count,
+        "countrycodes": "pl",
     }
+
+    if latitude is not None and longitude is not None:
+        min_lon = longitude - 0.4
+        max_lat = latitude + 0.4
+        max_lon = longitude + 0.4
+        min_lat = latitude - 0.4
+        params["viewbox"] = f"{min_lon:.4f},{max_lat:.4f},{max_lon:.4f},{min_lat:.4f}"
+        params["bounded"] = 0
+
+    headers = {"User-Agent": NOMINATIM_USER_AGENT}
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
-            response = await client.get(OPEN_METEO_GEOCODING_URL, params=params)
+            response = await client.get(
+                NOMINATIM_SEARCH_URL, params=params, headers=headers
+            )
             response.raise_for_status()
             data = response.json()
 
-        results = data.get("results", [])
         candidates: list[LocationItem] = []
 
-        for item in results:
-            name = item.get("name", clean_query)
-            lat = float(item["latitude"])
-            lon = float(item["longitude"])
-            country = item.get("country")
-            admin1 = item.get("admin1")
-
-            parts = [name]
-            if admin1 and admin1 != name:
-                parts.append(admin1)
-            if country:
-                parts.append(country)
-
-            display_name = ", ".join(parts)
+        for item in data:
+            name = (
+                item.get("name")
+                or item.get("display_name", clean_query).split(",")[0].strip()
+            )
+            lat = float(item["lat"])
+            lon = float(item["lon"])
+            display_name = item.get("display_name", name)
+            address = item.get("address", {})
+            country = address.get("country")
+            admin1 = address.get("state") or address.get("county")
 
             candidates.append(
                 LocationItem(
