@@ -158,6 +158,14 @@ export type AIRecommendationResponse = z.infer<
 >;
 
 /**
+ * Transfer payload pre-filling the Commute Logger from AI Advisor recommendations.
+ */
+export interface CommutePrefill {
+  readonly mode: TransportMode;
+  readonly durationMinutes: number;
+}
+
+/**
  * Discriminated union modeling all asynchronous UI data fetching states.
  * Eliminates invalid states by making status the single discriminator.
  */
