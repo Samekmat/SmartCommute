@@ -1,0 +1,209 @@
+"""Integration and functional tests for SmartCommute FastAPI REST API."""
+
+import pytest
+from app.database import init_db
+from app.main import app
+from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, create_engine
+
+
+@pytest.fixture
+def client_with_clean_db(monkeypatch: pytest.MonkeyPatch):
+    """Provide TestClient connected to an isolated in-memory SQLite database."""
+    test_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    init_db(test_engine)
+
+    def get_test_session():
+        with Session(test_engine) as session:
+            yield session
+
+    from app.database import get_session
+
+    app.dependency_overrides[get_session] = get_test_session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+def test_cors_headers_configured_for_frontend(client_with_clean_db: TestClient):
+    """OPTIONS request with Origin http://localhost:5173 returns allowed CORS headers."""
+    response = client_with_clean_db.options(
+        "/api/routes",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    )
+
+
+def test_get_routes_auto_seeds_when_database_is_empty(
+    client_with_clean_db: TestClient,
+):
+    """Initial GET /api/routes auto-seeds 3 predefined routes."""
+    response = client_with_clean_db.get("/api/routes")
+    assert response.status_code == 200
+    routes = response.json()
+    assert len(routes) == 3
+    assert routes[0]["name"] == "Dom -> Biuro"
+
+
+def test_create_route_success(client_with_clean_db: TestClient):
+    """POST /api/routes creates a valid route with HTTP 201."""
+    # Seed routes first
+    client_with_clean_db.get("/api/routes")
+
+    payload = {
+        "name": "Biuro -> Siłownia",
+        "origin": "Zabłocie",
+        "destination": "Kazimierz",
+        "distance_km": 2.4,
+        "latitude": 50.05,
+        "longitude": 19.95,
+        "preferred_transport": "bike",
+    }
+    response = client_with_clean_db.post("/api/routes", json=payload)
+    assert response.status_code == 201
+    created = response.json()
+    assert created["id"] is not None
+    assert created["name"] == "Biuro -> Siłownia"
+    assert created["distance_km"] == 2.4
+
+
+def test_create_route_validation_error(client_with_clean_db: TestClient):
+    """POST /api/routes with non-positive distance returns HTTP 422."""
+    payload = {
+        "name": "Błędna trasa",
+        "origin": "A",
+        "destination": "B",
+        "distance_km": -1.0,
+        "preferred_transport": "bike",
+    }
+    response = client_with_clean_db.post("/api/routes", json=payload)
+    assert response.status_code == 422
+
+
+def test_update_route_success_and_not_found(client_with_clean_db: TestClient):
+    """PUT /api/routes/{id} updates route or returns 404 if missing."""
+    # Seed database
+    routes = client_with_clean_db.get("/api/routes").json()
+    route_id = routes[0]["id"]
+
+    update_payload = {"name": "Nowa nazwa trasy", "distance_km": 7.5}
+    response = client_with_clean_db.put(f"/api/routes/{route_id}", json=update_payload)
+    assert response.status_code == 200
+    updated = response.json()
+    assert updated["name"] == "Nowa nazwa trasy"
+    assert updated["distance_km"] == 7.5
+
+    # 404 for non-existent route
+    response_404 = client_with_clean_db.put("/api/routes/99999", json=update_payload)
+    assert response_404.status_code == 404
+
+
+def test_delete_route_cascades_logs(client_with_clean_db: TestClient):
+    """DELETE /api/routes/{id} removes the route with HTTP 204."""
+    routes = client_with_clean_db.get("/api/routes").json()
+    route_id = routes[0]["id"]
+
+    response = client_with_clean_db.delete(f"/api/routes/{route_id}")
+    assert response.status_code == 204
+
+    # Verify route no longer returned
+    get_res = client_with_clean_db.get("/api/routes")
+    remaining_ids = [r["id"] for r in get_res.json()]
+    assert route_id not in remaining_ids
+
+    # 404 on deleting non-existent route
+    assert client_with_clean_db.delete("/api/routes/99999").status_code == 404
+
+
+def test_get_commutes_returns_logs_and_summary_stats(
+    client_with_clean_db: TestClient,
+):
+    """GET /api/commutes returns trip history and aggregated eco metrics."""
+    # Seed routes and default 4 commute logs
+    client_with_clean_db.get("/api/routes")
+
+    response = client_with_clean_db.get("/api/commutes")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "logs" in data
+    assert len(data["logs"]) == 4
+    assert data["trips_count"] == 4
+    assert data["total_co2_saved_kg"] > 0
+    assert data["total_calories"] > 0
+
+
+def test_post_commute_auto_calculates_eco_metrics(client_with_clean_db: TestClient):
+    """POST /api/commutes computes co2_saved_kg and calories_burned if omitted."""
+    routes = client_with_clean_db.get("/api/routes").json()
+    route = routes[0]  # Dom -> Biuro, 5.5 km
+
+    payload = {
+        "route_id": route["id"],
+        "transport_mode": "bike",
+        "duration_minutes": 25,
+    }
+    response = client_with_clean_db.post("/api/commutes", json=payload)
+    assert response.status_code == 201
+    created_log = response.json()
+
+    assert created_log["route_id"] == route["id"]
+    # 0.17 * 5.5 = 0.94 kg CO2, 32 * 5.5 = 176 kcal
+    assert created_log["co2_saved_kg"] == round(0.17 * 5.5, 2)
+    assert created_log["calories_burned"] == round(32 * 5.5)
+
+
+def test_post_commute_for_nonexistent_route_returns_404(
+    client_with_clean_db: TestClient,
+):
+    """POST /api/commutes for missing route_id returns HTTP 404."""
+    payload = {
+        "route_id": 99999,
+        "transport_mode": "walk",
+        "duration_minutes": 15,
+    }
+    response = client_with_clean_db.post("/api/commutes", json=payload)
+    assert response.status_code == 404
+
+
+def test_ai_recommend_endpoint_with_simulator_override(
+    client_with_clean_db: TestClient,
+):
+    """POST /api/routes/{id}/ai-recommend returns structured recommendation."""
+    routes = client_with_clean_db.get("/api/routes").json()
+    route_id = routes[0]["id"]
+
+    # Test with weather simulator override 'rain'
+    payload = {"weather_override": "rain"}
+    response = client_with_clean_db.post(
+        f"/api/routes/{route_id}/ai-recommend", json=payload
+    )
+    assert response.status_code == 200
+    recommendation = response.json()
+
+    assert recommendation["recommended_mode"] in ("public_transit", "car")
+    assert "weather_summary" in recommendation
+    assert "reasoning" in recommendation
+    assert recommendation["estimated_duration_min"] > 0
+    assert recommendation["ai_source"] in ("llm", "heuristic_fallback")
+
+
+def test_ai_recommend_for_nonexistent_route_returns_404(
+    client_with_clean_db: TestClient,
+):
+    """POST /api/routes/99999/ai-recommend returns HTTP 404."""
+    response = client_with_clean_db.post(
+        "/api/routes/99999/ai-recommend", json={"weather_override": "sunny"}
+    )
+    assert response.status_code == 404

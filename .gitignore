@@ -33,6 +33,7 @@ env.bak/
 venv.bak/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 *.db
 *.sqlite3
 
