@@ -66,7 +66,7 @@ Watch the full interactive application demonstration on Loom:
   - Integrated testing controls allowing recruiters and reviewers to test AI decisions under simulated conditions: **Live Weather**, **Heavy Rain**, **Sunny & Mild**, **Strong Wind**, and **Freezing Cold**.
 - **Zero-Config Out-of-the-Box Experience:**
   - Embedded SQLite database auto-seeds with realistic Kraków routes and commute history on initial startup.
-  - Transparent heuristic fallback engine activates automatically when `OPENAI_API_KEY` is not configured, returning identical structured JSON without failing.
+  - Transparent heuristic fallback engine activates automatically when no external LLM API key (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) is configured, returning identical structured JSON without failing.
   - Offline-resilient weather client provides synthetic fair weather if external APIs timeout or lose connection, eliminating HTTP 500 errors.
 
 ---
@@ -75,10 +75,10 @@ Watch the full interactive application demonstration on Loom:
 
 1. **Weather-Aware Multimodal Commute Optimization:** Rather than a static CRUD table, SmartCommute transforms routine route planning into an adaptive daily assistant. Bad weather automatically flags biking hazards and promotes public transit or car comfort, while mild weather maximizes eco savings and health gains.
 2. **Interactive Weather Simulator for Evaluators:** Instead of having to wait for actual rain or modify database coordinates, reviewers can click simulated weather pill buttons in the UI to instantly stress-test AI behavior across diverse meteorological scenarios.
-3. **Resilient Dual-Engine AI Architecture:**
-   - **Primary Engine:** OpenAI GPT model via structured prompt returning strict JSON.
+3. **Resilient Multi-Provider & Dual-Engine AI Architecture:**
+   - **Multi-Provider LLM Engine:** Supports **Google Gemini** (`gemini-3.5-flash-lite`, free tier, default in `auto`), **OpenAI** (`gpt-4o-mini`), and **Anthropic Claude** (`claude-3-5-haiku-20241022`) with runtime provider switching and in-app API key management.
    - **Heuristic Fallback Engine:** Deterministic rule matrix based on weather thresholds and route distances, returning the identical JSON contract.
-   - _Result:_ Zero configuration required for recruitment evaluation.
+   - _Result:_ Zero configuration required for recruitment evaluation, with complete freedom to use any preferred LLM provider.
 
 ---
 
@@ -170,7 +170,7 @@ chmod +x ./start.sh && ./start.sh
 - **Interactive Swagger API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 - **ReDoc Alternative Docs:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-_(Optional: If you want to use OpenAI LLM recommendations instead of the built-in heuristic engine, copy `.env.example` to `.env` in the root and set `OPENAI_API_KEY=sk-...`. No key is required by default!)_
+_(Optional: If you want to use live LLM recommendations instead of the built-in heuristic engine, configure `GEMINI_API_KEY` (recommended, free tier available), `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` in `.env` or directly inside the web UI. No key is required by default!)_
 
 ---
 
@@ -269,7 +269,7 @@ During development, specialized skills from `.agents/skills/` were invoked:
 The AI recommendation feature was architected with high reliability:
 
 - **Strict JSON Contract:** The prompt sent to the LLM provides contextual route data (distance, preferred mode) and weather parameters (temperature, precipitation, wind speed) and constrains output to a strict JSON structure matching `schemas.py:AIAdvisorResponse`.
-- **Zero-Config Heuristic Fallback Engine:** To guarantee an outstanding experience for evaluators without requiring API keys or payment cards, `services/ai_advisor.py` implements a deterministic heuristic decision matrix mirroring the LLM output structure. When `OPENAI_API_KEY` is omitted, the heuristic engine transparently takes over with zero runtime errors.
+- **Zero-Config Heuristic Fallback Engine:** To guarantee an outstanding experience for evaluators without requiring API keys or payment cards, `services/ai_advisor.py` implements a deterministic heuristic decision matrix mirroring the LLM output structure. When external LLM API keys are omitted, the heuristic engine transparently takes over with zero runtime errors.
 
 ---
 
@@ -369,7 +369,7 @@ Obejrzyj pełną prezentację działania aplikacji na platformie Loom:
   - Wbudowany panel umożliwiający rekruterowi natychmiastowe przetestowanie decyzji AI w różnych warunkach: **Pogoda na żywo**, **Ulewny deszcz**, **Słonecznie i ciepło**, **Silny wiatr** oraz **Mróz**.
 - **Niezawodność Zero-Config:**
   - Baza SQLite automatycznie wypełnia się przykładowymi trasami i dojazdami przy pierwszym starcie.
-  - Deterministyczny silnik fallbackowy aktywuje się samoczynnie przy braku zmiennej `OPENAI_API_KEY`, zwracając identyczną strukturę odpowiedzi JSON.
+  - Deterministyczny silnik fallbackowy aktywuje się samoczynnie przy braku jakichkolwiek kluczy API (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`), zwracając identyczną strukturę odpowiedzi JSON.
   - Odporność na brak sieci: klient Open-Meteo w razie timeoutu lub braku internetu zwraca bezpieczną syntetyczną prognozę, eliminując błędy HTTP 500.
 
 ---
@@ -378,10 +378,10 @@ Obejrzyj pełną prezentację działania aplikacji na platformie Loom:
 
 1. **Multimodalna, pogodowa optymalizacja dojazdu:** Aplikacja wykracza poza zwykłą tabelę CRUD, stając się codziennym doradcą transportowym. Zła pogoda ostrzega przed ryzykiem jazdy na rowerze i promuje komunikację miejską, a dobra pogoda maksymalizuje oszczędności $CO_2$ i korzyści zdrowotne.
 2. **Symulator pogody dla rekrutera:** Sprawdzający nie musi czekać na deszcz w Krakowie ani ręcznie edytować bazy danych – kliknięcie jednego przycisku w interfejsie pozwala natychmiast zweryfikować adaptacyjność AI.
-3. **Odporna dwusilnikowa architektura AI:**
-   - **Silnik podstawowy:** Model OpenAI GPT ze ścisłym promptem wymuszającym format JSON.
+3. **Odporna wielomodelowa architektura AI (Multi-Provider):**
+   - **Silnik modeli LLM:** Obsługa **Google Gemini** (`gemini-3.5-flash-lite` – domyślny w trybie `auto`, bezpłatny tier bez karty), **OpenAI** (`gpt-4o-mini`) oraz **Anthropic Claude** (`claude-3-5-haiku-20241022`), z możliwością wyboru dostawcy i konfiguracji klucza bezpośrednio w interfejsie.
    - **Silnik heurystyczny (Fallback):** Deterministyczna matryca regułowa oparta na progach pogodowych i dystansie, zwracająca identyczny kontrakt JSON.
-   - _Efekt:_ Aplikacja działa w 100% od razu po sklonowaniu, bez potrzeby wprowadzania jakichkolwiek płatnych kluczy API.
+   - _Efekt:_ Aplikacja działa w 100% od razu po sklonowaniu, bez potrzeby wprowadzania jakichkolwiek płatnych kluczy API, z pełną elastycznością podłączenia dowolnego providera.
 
 ---
 
@@ -473,7 +473,7 @@ chmod +x ./start.sh && ./start.sh
 - **Interaktywna dokumentacja Swagger API:** [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Alternatywna dokumentacja ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-_(Opcjonalnie: Jeśli chcesz przetestować zapytania do prawdziwego modelu OpenAI zamiast silnika heurystycznego, skopiuj `.env.example` do `.env` w katalogu głównym i wpisz swój klucz `OPENAI_API_KEY=sk-...`. Domyślnie żaden klucz nie jest wymagany!)_
+_(Opcjonalnie: Jeśli chcesz przetestować zapytania do modeli LLM zamiast silnika heurystycznego, uzupełnij klucz `GEMINI_API_KEY` (zalecany, darmowy tier), `OPENAI_API_KEY` lub `ANTHROPIC_API_KEY` w pliku `.env` lub wprowadź go bezpośrednio w interfejsie UI. Domyślnie żaden klucz nie jest wymagany!)_
 
 ---
 
@@ -574,7 +574,7 @@ W trakcie implementacji aktywnie korzystano z dedykowanych skilli zlokalizowanyc
 Funkcjonalność doradcy AI została zaprojektowana z myślą o maksymalnej niezawodności:
 
 - **Ścisły kontrakt JSON:** Prompt przekazywany do modelu LLM dostarcza kontekst trasy oraz parametry pogodowe i wymusza odpowiedź w postaci ustrukturyzowanego formatu JSON zgodnego ze schematem `AIAdvisorResponse`.
-- **Deterministyczny silnik fallbackowy (Zero-Config):** Aby zapewnić osobie oceniającej pełne działanie aplikacji bez konieczności konfigurowania kluczy API, serwis `services/ai_advisor.py` zawiera deterministyczną matrycę heurystyczną. W przypadku braku zmiennej `OPENAI_API_KEY` silnik regułowy bezbłędnie generuje spójne uzasadnienia i rekomendacje bez żadnych błędów wykonania.
+- **Deterministyczny silnik fallbackowy (Zero-Config):** Aby zapewnić osobie oceniającej pełne działanie aplikacji bez konieczności konfigurowania kluczy API, serwis `services/ai_advisor.py` zawiera deterministyczną matrycę heurystyczną. W przypadku braku zewnętrznych kluczy API (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) silnik regułowy bezbłędnie generuje spójne uzasadnienia i rekomendacje bez żadnych błędów wykonania.
 
 ---
 
