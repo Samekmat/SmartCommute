@@ -48,6 +48,11 @@ This project is a Full-Stack MVP (**Python FastAPI + React TypeScript**) built w
   - `chore: ...` – maintenance tasks and dependency updates
 - The format is validated and enforced automatically on each commit via Husky's `commit-msg` hook (Commitlint).
 
+### 5. Code Documentation & Comments Hygiene
+
+- **Docstrings & JSDoc:** Every module, entity, router, schema, and public utility/hook must include clear, professional docstrings (PEP 257 for Python) or JSDoc (for TypeScript) detailing purpose, parameters, and return semantics.
+- **Purposeful Comments Only:** Inline comments are strictly reserved for non-obvious domain logic, mathematical constants/formulas (e.g. emission coefficients), or infrastructure caveats (e.g. SQLite thread/pragma requirements). Never write redundant or self-evident comments that merely echo the code.
+
 ### Agent skills
 
 #### Issue tracker
@@ -109,6 +114,11 @@ Ten projekt to Full-Stack MVP (**Python FastAPI + React TypeScript**) realizowan
   - `test: ...` – dodanie lub zmiana testów
   - `chore: ...` – zadania pomocnicze, aktualizacja zależności
 - Standard jest walidowany i egzekwowany automatycznie przed każdym commitem za pośrednictwem hooka `commit-msg` (Husky + Commitlint).
+
+### 5. Higiena dokumentacji kodu i komentarzy
+
+- **Docstringi i JSDoc:** Każdy moduł, encja bazodanowa, router, schemat oraz publiczna funkcja/hook musi posiadać czytelny, profesjonalny docstring (zgodny z PEP 257 dla Pythona) lub JSDoc (dla TypeScriptu) opisujący przeznaczenie, parametry i zwracane wartości.
+- **Tylko celowe komentarze:** Komentarze liniowe stosuj wyłącznie w miejscach wymagających wyjaśnienia nieoczywistej logiki domenowej, stałych/wzorów matematycznych (np. wskaźniki emisji) lub uwarunkowań infrastrukturalnych (np. pragmy SQLite). Bezwzględnie unikaj zbędnych komentarzy powielających sam kod.
 
 ### Umiejętności agenta (Agent skills)
 
