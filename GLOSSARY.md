@@ -1,8 +1,14 @@
-# SmartCommute
+# SmartCommute — Domain Glossary / Słownik Domenowy
+
+[English version](#english) | [Wersja polska](#wersja-polska)
+
+<a name="english"></a>
+
+## English
 
 SmartCommute is an eco-conscious commute planner and tracker combining live weather data, AI recommendations, and environmental impact calculations.
 
-## Language
+### Language
 
 **Route**:
 A predefined regular travel path between an origin and destination with a fixed distance and geographical coordinates.
@@ -31,3 +37,41 @@ _Avoid_: Weather override, mock weather, forecast tester
 **Zero-Config Fallback**:
 A deterministic rule engine that provides complete AI Advisor recommendations without crashing or failing when external LLM credentials (`OPENAI_API_KEY`) are omitted.
 _Avoid_: Offline mode, dummy advisor, mock response
+
+---
+
+<a name="wersja-polska"></a>
+
+## Wersja polska
+
+SmartCommute to ekologiczny planer i rejestrator codziennych dojazdów, łączący dane pogodowe na żywo, rekomendacje sztucznej inteligencji oraz kalkulację wpływu na środowisko.
+
+### Język domeny
+
+**Trasa (Route)**:
+Zdefiniowana stała droga przemieszczania się między punktem startowym a docelowym, posiadająca określony dystans oraz współrzędne geograficzne.
+_Unikaj_: Wycieczka, ścieżka, podróż, przejazd
+
+**Dziennik dojazdu (Commute Log)**:
+Zarejestrowany wpis o faktycznie odbytym przejeździe na zdefiniowanej Trasie, zawierający wybrany środek transportu, czas trwania, zaoszczędzone emisje i spalone kalorie.
+_Unikaj_: Historia przejazdów, log podróży, wpis trasy
+
+**Środek transportu (Transport Mode)**:
+Kanoniczny dyskretny sposób podróżowania, przyjmujący wyłącznie jedną z wartości: `car`, `bike`, `public_transit` lub `walk`.
+_Unikaj_: Typ pojazdu, metoda dojazdu, kategoria transportu
+
+**Wskaźniki ekologiczne (Eco Metrics)**:
+Obliczane wskaźniki środowiskowe i zdrowotne dla Dziennika dojazdu: kilogramy zaoszczędzonego CO2 względem bazowego samochodu spalinowego (0.17 kg CO2/km) oraz spalone aktywne kalorie.
+_Unikaj_: Punkty eko, redukcja śladu, statystyki zielone
+
+**Doradca AI (AI Advisor)**:
+Moduł rekomendacyjny analizujący parametry trasy oraz bieżącą pogodę w celu zasugerowania optymalnego Środka transportu wraz z czytelnym uzasadnieniem.
+_Unikaj_: Optymalizator trasy, bot podróżny, silnik sugestii
+
+**Symulator pogody (Weather Simulator)**:
+Interaktywny panel testowy umożliwiający weryfikację rekomendacji transportowych w symulowanych warunkach (deszcz, słońce, wiatr, mróz) równolegle z realnymi danymi Open-Meteo.
+_Unikaj_: Nadpisanie pogody, mock pogody, tester prognozy
+
+**Fallback Zero-Config (Zero-Config Fallback)**:
+Deterministyczny silnik regułowy dostarczający kompletne rekomendacje Doradcy AI bez zgłaszania błędów w przypadku braku zewnętrznego klucza API (`OPENAI_API_KEY`).
+_Unikaj_: Tryb offline, atrapa AI, pusta odpowiedź

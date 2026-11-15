@@ -26,6 +26,7 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 | -------------------- | ----------------------------------------------- |
 | `BE`                 | Backend (Python, FastAPI, SQLModel, Pydantic)   |
 | `FE`                 | Frontend (React, TypeScript, Vite, TailwindCSS) |
+| `test`               | Unit and integration tests (backend & frontend) |
 
 ---
 
@@ -53,3 +54,4 @@ Gdy umiejętność odnosi się do roli (np. "nadaj etykietę gotowości dla agen
 | -------------------- | ----------------------------------------------- |
 | `BE`                 | Backend (Python, FastAPI, SQLModel, Pydantic)   |
 | `FE`                 | Frontend (React, TypeScript, Vite, TailwindCSS) |
+| `test`               | Testy jednostkowe i integracyjne (BE i FE)      |
