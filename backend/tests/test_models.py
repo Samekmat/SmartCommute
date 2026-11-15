@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 
 import pytest
 from app.models import CommuteLog, Route
-from pydantic import ValidationError
 
 
 def test_create_valid_route_with_defaults():
@@ -26,7 +25,7 @@ def test_create_valid_route_with_defaults():
 
 
 def test_route_distance_km_must_be_greater_than_zero():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         Route(
             name="Invalid Distance Route",
             origin="Point A",
@@ -35,7 +34,7 @@ def test_route_distance_km_must_be_greater_than_zero():
             preferred_transport="car",
         )
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         Route(
             name="Negative Distance Route",
             origin="Point A",
@@ -46,7 +45,7 @@ def test_route_distance_km_must_be_greater_than_zero():
 
 
 def test_route_preferred_transport_must_be_canonical_mode():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         Route(
             name="Invalid Transport Mode",
             origin="Point A",
@@ -77,7 +76,7 @@ def test_create_valid_commute_log():
 
 
 def test_commute_log_duration_minutes_must_be_greater_than_zero():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         CommuteLog(
             route_id=1,
             transport_mode="walk",
@@ -88,7 +87,7 @@ def test_commute_log_duration_minutes_must_be_greater_than_zero():
 
 
 def test_commute_log_transport_mode_must_be_canonical_mode():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         CommuteLog(
             route_id=1,
             transport_mode="plane",  # type: ignore[arg-type]

@@ -1,19 +1,6 @@
-import pytest
-from app.database import init_db
 from app.models import CommuteLog, Route
 from app.seed import seed_database
-from sqlmodel import Session, create_engine, select
-
-
-@pytest.fixture
-def memory_session():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-    )
-    init_db(engine)
-    with Session(engine) as session:
-        yield session
+from sqlmodel import Session, select
 
 
 def test_seed_database_populates_routes_and_logs_when_empty(memory_session: Session):
