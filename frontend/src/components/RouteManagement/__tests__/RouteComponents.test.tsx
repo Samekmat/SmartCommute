@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { RouteList } from "../RouteList";
 import { RouteModal } from "../RouteModal";
 import { Route } from "../../../types/commute";
+import { api } from "../../../api/client";
 
 const mockRoute: Route = {
   id: 1,
@@ -134,6 +135,11 @@ describe("RouteModal Component", () => {
     });
     expect(fetchButtons.length).toBe(2);
 
+    const gpsButtons = screen.getAllByRole("button", {
+      name: /^GPS$/i,
+    });
+    expect(gpsButtons.length).toBe(2);
+
     // Advanced weather coordinates are collapsed by default
     const toggleButton = screen.getByRole("button", {
       name: /Zaawansowane: Lokalizacja stacji pogodowej/i,
@@ -149,5 +155,59 @@ describe("RouteModal Component", () => {
     expect(screen.getByRole("button", { name: /Wykryj adres/i })).toBeDefined();
     expect(screen.getByLabelText(/Latitude/i)).toBeDefined();
     expect(screen.getByLabelText(/Longitude/i)).toBeDefined();
+  });
+
+  it("automatically calculates distance between origin and destination search results", async () => {
+    const searchSpy = vi.spyOn(api, "searchLocations");
+    searchSpy.mockResolvedValueOnce([
+      {
+        name: "Rynek Główny",
+        latitude: 50.0614,
+        longitude: 19.9366,
+        display_name: "Rynek Główny, Kraków",
+      },
+    ]);
+    searchSpy.mockResolvedValueOnce([
+      {
+        name: "Plac Centralny",
+        latitude: 50.0716,
+        longitude: 20.0375,
+        display_name: "Plac Centralny, Nowa Huta",
+      },
+    ]);
+
+    render(<RouteModal isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />);
+
+    // Fill origin and search coords
+    const originInput = screen.getByLabelText(/Origin \(Start\)/i);
+    fireEvent.change(originInput, { target: { value: "Rynek Główny" } });
+    const fetchOriginBtn = screen.getAllByRole("button", {
+      name: /Pobierz współrzędne/i,
+    })[0];
+    if (!fetchOriginBtn) throw new Error("fetchOriginBtn not found");
+    fireEvent.click(fetchOriginBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Ustawiono punkt startowy: Rynek Główny, Kraków/i)
+      ).toBeDefined();
+    });
+
+    // Fill destination and search coords
+    const destInput = screen.getByLabelText(/Destination \(Cel\)/i);
+    fireEvent.change(destInput, { target: { value: "Plac Centralny" } });
+    const fetchDestBtn = screen.getAllByRole("button", {
+      name: /Pobierz współrzędne/i,
+    })[1];
+    if (!fetchDestBtn) throw new Error("fetchDestBtn not found");
+    fireEvent.click(fetchDestBtn);
+
+    await waitFor(() => {
+      // Distance between (50.0614, 19.9366) and (50.0716, 20.0375) is 7.3 km
+      expect(screen.getByDisplayValue("7.3")).toBeDefined();
+      expect(screen.getByText(/obliczono dystans: 7\.3 km/i)).toBeDefined();
+    });
+
+    searchSpy.mockRestore();
   });
 });

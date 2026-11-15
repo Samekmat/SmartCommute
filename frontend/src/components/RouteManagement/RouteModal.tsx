@@ -8,8 +8,14 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  Sparkles,
 } from "lucide-react";
 import { api } from "../../api/client";
+import {
+  calculateHaversineDistanceKm,
+  Coordinates,
+  formatCoordinates,
+} from "../../utils/geo";
 import {
   AsyncState,
   errorState,
@@ -57,6 +63,12 @@ export function RouteModal({
   const [distanceKm, setDistanceKm] = useState("5.0");
   const [latitude, setLatitude] = useState("50.0647");
   const [longitude, setLongitude] = useState("19.9450");
+  const [originCoords, setOriginCoords] = useState<Coordinates | null>({
+    latitude: 50.0647,
+    longitude: 19.945,
+  });
+  const [destCoords, setDestCoords] = useState<Coordinates | null>(null);
+  const [isAutoDistance, setIsAutoDistance] = useState<boolean>(false);
   const [preferredTransport, setPreferredTransport] =
     useState<TransportMode>("bike");
   const [saveState, setSaveState] = useState<AsyncState<void>>(idleState());
@@ -71,6 +83,22 @@ export function RouteModal({
   >(null);
   const [geoNotice, setGeoNotice] = useState<string | null>(null);
 
+  /**
+   * Automatically calculates great-circle distance between two points if both are known.
+   */
+  function tryAutoCalculateDistance(
+    orig: Coordinates | null,
+    dest: Coordinates | null
+  ): number | null {
+    if (orig && dest) {
+      const calculatedKm = calculateHaversineDistanceKm(orig, dest);
+      setDistanceKm(calculatedKm.toFixed(1));
+      setIsAutoDistance(true);
+      return calculatedKm;
+    }
+    return null;
+  }
+
   useEffect(() => {
     if (routeToEdit) {
       setName(routeToEdit.name);
@@ -80,6 +108,11 @@ export function RouteModal({
       setLatitude(String(routeToEdit.latitude));
       setLongitude(String(routeToEdit.longitude));
       setPreferredTransport(routeToEdit.preferred_transport);
+      setOriginCoords({
+        latitude: routeToEdit.latitude,
+        longitude: routeToEdit.longitude,
+      });
+      setDestCoords(null);
     } else {
       setName("");
       setOrigin("");
@@ -88,7 +121,13 @@ export function RouteModal({
       setLatitude("50.0647");
       setLongitude("19.9450");
       setPreferredTransport("bike");
+      setOriginCoords({
+        latitude: 50.0647,
+        longitude: 19.945,
+      });
+      setDestCoords(null);
     }
+    setIsAutoDistance(false);
     setIsAdvancedOpen(false);
     setSaveState(idleState());
     setGeoResults([]);
@@ -98,27 +137,69 @@ export function RouteModal({
 
   /**
    * Performs a quiet background geocode lookup when origin field loses focus,
-   * provided the origin is non-empty and coordinates are still at default Kraków values.
+   * calculating distance if destination coordinates are already resolved.
    */
   async function handleOriginBlur() {
     const trimmed = origin.trim();
     if (
       trimmed.length >= 3 &&
-      latitude === "50.0647" &&
-      longitude === "19.9450"
+      (!originCoords || (latitude === "50.0647" && longitude === "19.9450"))
     ) {
       try {
         const results = await api.searchLocations(trimmed, 1);
         if (results.length > 0 && results[0]) {
           const item = results[0];
+          const newOrig: Coordinates = {
+            latitude: item.latitude,
+            longitude: item.longitude,
+          };
+          setOriginCoords(newOrig);
           setLatitude(item.latitude.toFixed(4));
           setLongitude(item.longitude.toFixed(4));
-          setGeoNotice(
-            `Automatycznie ustawiono punkt pogodowy: ${item.display_name}`
-          );
+          const calculated = tryAutoCalculateDistance(newOrig, destCoords);
+          if (calculated !== null) {
+            setGeoNotice(
+              `Wykryto start: ${item.display_name} i automatycznie obliczono dystans: ${calculated.toFixed(1)} km`
+            );
+          } else {
+            setGeoNotice(
+              `Automatycznie ustawiono punkt startowy: ${item.display_name}`
+            );
+          }
         }
       } catch {
         // Silent fallback - manual trigger and advanced inputs remain available
+      }
+    }
+  }
+
+  /**
+   * Performs a quiet background geocode lookup when destination field loses focus,
+   * calculating distance if origin coordinates are already resolved.
+   */
+  async function handleDestinationBlur() {
+    const trimmed = destination.trim();
+    if (trimmed.length >= 3 && !destCoords) {
+      try {
+        const results = await api.searchLocations(trimmed, 1);
+        if (results.length > 0 && results[0]) {
+          const item = results[0];
+          const newDest: Coordinates = {
+            latitude: item.latitude,
+            longitude: item.longitude,
+          };
+          setDestCoords(newDest);
+          const calculated = tryAutoCalculateDistance(originCoords, newDest);
+          if (calculated !== null) {
+            setGeoNotice(
+              `Wykryto cel: ${item.display_name} i automatycznie obliczono dystans: ${calculated.toFixed(1)} km`
+            );
+          } else {
+            setGeoNotice(`Wykryto cel podróży: ${item.display_name}`);
+          }
+        }
+      } catch {
+        // Silent fallback
       }
     }
   }
@@ -142,11 +223,32 @@ export function RouteModal({
         setGeoSearchTarget(null);
       } else if (results.length === 1 && results[0]) {
         const item = results[0];
-        setLatitude(item.latitude.toFixed(4));
-        setLongitude(item.longitude.toFixed(4));
-        setGeoNotice(
-          `Ustawiono współrzędne pogodowe dla: ${item.display_name}`
-        );
+        const coords: Coordinates = {
+          latitude: item.latitude,
+          longitude: item.longitude,
+        };
+
+        if (target === "origin") {
+          setOrigin(item.name);
+          setOriginCoords(coords);
+          setLatitude(item.latitude.toFixed(4));
+          setLongitude(item.longitude.toFixed(4));
+          const calculated = tryAutoCalculateDistance(coords, destCoords);
+          setGeoNotice(
+            calculated !== null
+              ? `Ustawiono start: ${item.display_name} i obliczono dystans: ${calculated.toFixed(1)} km`
+              : `Ustawiono punkt startowy: ${item.display_name}`
+          );
+        } else {
+          setDestination(item.name);
+          setDestCoords(coords);
+          const calculated = tryAutoCalculateDistance(originCoords, coords);
+          setGeoNotice(
+            calculated !== null
+              ? `Ustawiono cel: ${item.display_name} i obliczono dystans: ${calculated.toFixed(1)} km`
+              : `Ustawiono cel podróży: ${item.display_name}`
+          );
+        }
         setGeoResults([]);
         setGeoSearchTarget(null);
       } else {
@@ -161,14 +263,32 @@ export function RouteModal({
   }
 
   function handleSelectGeoItem(item: LocationSearchResult) {
-    setLatitude(item.latitude.toFixed(4));
-    setLongitude(item.longitude.toFixed(4));
+    const coords: Coordinates = {
+      latitude: item.latitude,
+      longitude: item.longitude,
+    };
+
     if (geoSearchTarget === "origin") {
       setOrigin(item.name);
+      setOriginCoords(coords);
+      setLatitude(item.latitude.toFixed(4));
+      setLongitude(item.longitude.toFixed(4));
+      const calculated = tryAutoCalculateDistance(coords, destCoords);
+      setGeoNotice(
+        calculated !== null
+          ? `Wybrano start: ${item.display_name} i obliczono dystans: ${calculated.toFixed(1)} km`
+          : `Wybrano start: ${item.display_name}`
+      );
     } else if (geoSearchTarget === "destination") {
       setDestination(item.name);
+      setDestCoords(coords);
+      const calculated = tryAutoCalculateDistance(originCoords, coords);
+      setGeoNotice(
+        calculated !== null
+          ? `Wybrano cel: ${item.display_name} i obliczono dystans: ${calculated.toFixed(1)} km`
+          : `Wybrano cel: ${item.display_name}`
+      );
     }
-    setGeoNotice(`Ustawiono punkt pogodowy: ${item.display_name}`);
     setGeoResults([]);
     setGeoSearchTarget(null);
   }
@@ -187,9 +307,29 @@ export function RouteModal({
       setIsReverseGeo(true);
       setGeoNotice(null);
       const res = await api.reverseGeocode(lat, lon);
-      setGeoNotice(`Wykryto lokalizację: ${res.display_name}`);
-      if (!origin.trim() && res.city) {
-        setOrigin(res.city);
+      const placeName = res.city ?? res.display_name;
+      const coords: Coordinates = { latitude: lat, longitude: lon };
+
+      if (!origin.trim()) {
+        setOrigin(placeName);
+        setOriginCoords(coords);
+        const calculated = tryAutoCalculateDistance(coords, destCoords);
+        setGeoNotice(
+          calculated !== null
+            ? `Wykryto lokalizację startu: ${placeName} i obliczono dystans: ${calculated.toFixed(1)} km`
+            : `Wykryto lokalizację startu: ${placeName}`
+        );
+      } else if (!destination.trim()) {
+        setDestination(placeName);
+        setDestCoords(coords);
+        const calculated = tryAutoCalculateDistance(originCoords, coords);
+        setGeoNotice(
+          calculated !== null
+            ? `Wykryto lokalizację celu: ${placeName} i obliczono dystans: ${calculated.toFixed(1)} km`
+            : `Wykryto lokalizację celu: ${placeName}`
+        );
+      } else {
+        setGeoNotice(`Wykryto lokalizację: ${res.display_name}`);
       }
     } catch {
       setGeoNotice("Nie udało się odczytać adresu ze współrzędnych.");
@@ -198,7 +338,7 @@ export function RouteModal({
     }
   }
 
-  function handleUseGps() {
+  function handleUseGps(target: "origin" | "destination" = "origin") {
     if (!navigator.geolocation) {
       setGeoNotice(
         "Geolokalizacja nie jest wspierana przez Twoją przeglądarkę."
@@ -212,17 +352,45 @@ export function RouteModal({
       async (pos) => {
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
-        setLatitude(lat.toFixed(4));
-        setLongitude(lon.toFixed(4));
+        const coords: Coordinates = { latitude: lat, longitude: lon };
+
         try {
           const res = await api.reverseGeocode(lat, lon);
-          setGeoNotice(`Wykryto Twoją pozycję GPS: ${res.display_name}`);
-          if (!origin.trim() && res.city) {
-            setOrigin(res.city);
+          const placeName = res.city ?? res.display_name;
+
+          if (target === "origin") {
+            setOrigin(placeName);
+            setOriginCoords(coords);
+            setLatitude(lat.toFixed(4));
+            setLongitude(lon.toFixed(4));
+            const calculated = tryAutoCalculateDistance(coords, destCoords);
+            setGeoNotice(
+              calculated !== null
+                ? `Wykryto GPS dla punktu startowego: ${placeName} i obliczono dystans: ${calculated.toFixed(1)} km`
+                : `Wykryto pozycję GPS dla startu: ${placeName}`
+            );
+          } else {
+            setDestination(placeName);
+            setDestCoords(coords);
+            const calculated = tryAutoCalculateDistance(originCoords, coords);
+            setGeoNotice(
+              calculated !== null
+                ? `Wykryto GPS dla celu: ${placeName} i obliczono dystans: ${calculated.toFixed(1)} km`
+                : `Wykryto pozycję GPS dla celu: ${placeName}`
+            );
           }
         } catch {
+          if (target === "origin") {
+            setOriginCoords(coords);
+            setLatitude(lat.toFixed(4));
+            setLongitude(lon.toFixed(4));
+            tryAutoCalculateDistance(coords, destCoords);
+          } else {
+            setDestCoords(coords);
+            tryAutoCalculateDistance(originCoords, coords);
+          }
           setGeoNotice(
-            `Ustawiono współrzędne GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}`
+            `Ustawiono współrzędne GPS (${lat.toFixed(4)}, ${lon.toFixed(4)}) dla ${target === "origin" ? "startu" : "celu"}`
           );
         } finally {
           setIsGpsLoading(false);
@@ -366,22 +534,38 @@ export function RouteModal({
                   htmlFor="route-origin"
                   className="block text-xs font-medium text-slate-700"
                 >
-                  Origin
+                  Origin (Start)
                 </label>
-                <button
-                  type="button"
-                  onClick={() => handleSearchCoords("origin")}
-                  disabled={isSearchingGeo}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 font-medium disabled:opacity-50"
-                  title="Wyszukaj współrzędne dla punktu początkowego"
-                >
-                  {isSearchingGeo && geoSearchTarget === "origin" ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <MapPin className="h-3 w-3" />
-                  )}
-                  <span>Pobierz współrzędne</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleUseGps("origin")}
+                    disabled={isGpsLoading}
+                    className="text-[11px] text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 font-medium transition-colors disabled:opacity-50"
+                    title="Pobierz pozycję GPS dla punktu startowego"
+                  >
+                    {isGpsLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Navigation className="h-3 w-3" />
+                    )}
+                    <span>GPS</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSearchCoords("origin")}
+                    disabled={isSearchingGeo}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 font-medium disabled:opacity-50"
+                    title="Wyszukaj współrzędne dla punktu początkowego"
+                  >
+                    {isSearchingGeo && geoSearchTarget === "origin" ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <MapPin className="h-3 w-3" />
+                    )}
+                    <span>Pobierz współrzędne</span>
+                  </button>
+                </div>
               </div>
               <input
                 id="route-origin"
@@ -404,22 +588,38 @@ export function RouteModal({
                   htmlFor="route-destination"
                   className="block text-xs font-medium text-slate-700"
                 >
-                  Destination
+                  Destination (Cel)
                 </label>
-                <button
-                  type="button"
-                  onClick={() => handleSearchCoords("destination")}
-                  disabled={isSearchingGeo}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 font-medium disabled:opacity-50"
-                  title="Wyszukaj i ustaw współrzędne pogodowe dla celu podróży"
-                >
-                  {isSearchingGeo && geoSearchTarget === "destination" ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <MapPin className="h-3 w-3" />
-                  )}
-                  <span>Pobierz współrzędne</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleUseGps("destination")}
+                    disabled={isGpsLoading}
+                    className="text-[11px] text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 font-medium transition-colors disabled:opacity-50"
+                    title="Pobierz pozycję GPS dla celu podróży"
+                  >
+                    {isGpsLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Navigation className="h-3 w-3" />
+                    )}
+                    <span>GPS</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSearchCoords("destination")}
+                    disabled={isSearchingGeo}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 font-medium disabled:opacity-50"
+                    title="Wyszukaj współrzędne dla celu podróży"
+                  >
+                    {isSearchingGeo && geoSearchTarget === "destination" ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <MapPin className="h-3 w-3" />
+                    )}
+                    <span>Pobierz współrzędne</span>
+                  </button>
+                </div>
               </div>
               <input
                 id="route-destination"
@@ -430,6 +630,7 @@ export function RouteModal({
                   setDestination(e.target.value);
                   setSaveState(idleState());
                 }}
+                onBlur={handleDestinationBlur}
                 placeholder="e.g. Rondo Grzegórzeckie"
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
@@ -463,12 +664,27 @@ export function RouteModal({
           )}
 
           <div>
-            <label
-              htmlFor="route-distance"
-              className="block text-xs font-medium text-slate-700 mb-1"
-            >
-              Distance (km)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label
+                htmlFor="route-distance"
+                className="block text-xs font-medium text-slate-700"
+              >
+                Distance (km)
+              </label>
+              {originCoords && destCoords && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    tryAutoCalculateDistance(originCoords, destCoords)
+                  }
+                  className="text-[11px] text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 transition-colors"
+                  title="Kliknij, aby przeliczyć dystans na podstawie współrzędnych Startu i Celu"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span>Przelicz z koordynatów</span>
+                </button>
+              )}
+            </div>
             <input
               id="route-distance"
               type="number"
@@ -478,10 +694,21 @@ export function RouteModal({
               value={distanceKm}
               onChange={(e) => {
                 setDistanceKm(e.target.value);
+                setIsAutoDistance(false);
                 setSaveState(idleState());
               }}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
+            {originCoords && destCoords && isAutoDistance && (
+              <p className="mt-1 text-[11px] text-emerald-600 flex items-center gap-1">
+                <span>
+                  ✓ Obliczono dystans w linii prostej z koordynatów (
+                  {formatCoordinates(originCoords, 2)} ➔{" "}
+                  {formatCoordinates(destCoords, 2)}). Możesz go w każdej chwili
+                  skorygować.
+                </span>
+              </p>
+            )}
           </div>
 
           <div>
@@ -535,6 +762,30 @@ export function RouteModal({
                   </span>
                 </div>
 
+                {/* Endpoints overview */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                  <div>
+                    <span className="text-slate-500 font-medium block">
+                      Koordynaty Startu:
+                    </span>
+                    <span className="font-mono text-slate-700">
+                      {originCoords
+                        ? formatCoordinates(originCoords)
+                        : "Nie określono"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block">
+                      Koordynaty Celu:
+                    </span>
+                    <span className="font-mono text-slate-700">
+                      {destCoords
+                        ? formatCoordinates(destCoords)
+                        : "Nie określono"}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
                   <span className="text-xs font-medium text-slate-700">
                     Narzędzia współrzędnych
@@ -542,10 +793,10 @@ export function RouteModal({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={handleUseGps}
+                      onClick={() => handleUseGps("origin")}
                       disabled={isGpsLoading}
                       className="text-[11px] text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors disabled:opacity-50"
-                      title="Wczytaj pozycję z GPS przeglądarki"
+                      title="Wczytaj pozycję z GPS przeglądarki do punktu startowego"
                     >
                       {isGpsLoading ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
