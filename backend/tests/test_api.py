@@ -331,3 +331,36 @@ def test_ai_recommend_invalid_weather_override_returns_422(
         f"/api/routes/{route_id}/ai-recommend", json={"weather_override": "cyclone"}
     )
     assert response.status_code == 422
+
+
+def test_ai_status_endpoint_returns_boolean_flags(client_with_clean_db: TestClient):
+    """GET /api/ai/status returns provider presence indicators without exposing keys."""
+    response = client_with_clean_db.get("/api/ai/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert "gemini_configured" in data
+    assert "openai_configured" in data
+    assert "claude_configured" in data
+    assert "active_default" in data
+    assert isinstance(data["gemini_configured"], bool)
+
+
+def test_ai_config_endpoint_registers_key_in_session(
+    client_with_clean_db: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    """POST /api/ai/config registers provider key."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    payload = {
+        "provider": "gemini",
+        "api_key": "AIzaSyTestKey123",
+        "save_to_env": False,
+    }
+    response = client_with_clean_db.post("/api/ai/config", json=payload)
+    assert response.status_code == 200
+    res_data = response.json()
+    assert res_data["provider"] == "gemini"
+    assert res_data["saved_to_env"] is False
+
+    # Status should now indicate gemini is configured
+    status_res = client_with_clean_db.get("/api/ai/status")
+    assert status_res.json()["gemini_configured"] is True

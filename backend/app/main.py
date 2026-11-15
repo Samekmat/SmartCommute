@@ -9,7 +9,7 @@ from sqlmodel import Session
 
 from app.config import load_env_file
 from app.database import engine, init_db
-from app.routers import commutes, routes
+from app.routers import ai, commutes, routes
 from app.seed import seed_database
 
 # Load .env file if present
@@ -60,3 +60,4 @@ app.add_middleware(
 
 app.include_router(routes.router)
 app.include_router(commutes.router)
+app.include_router(ai.router)

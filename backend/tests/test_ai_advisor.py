@@ -418,3 +418,116 @@ async def test_llm_recommendation_graceful_fallback_on_api_error(
 
     assert rec.ai_source == "heuristic_fallback"
     assert rec.recommended_mode == "bike"
+
+
+@pytest.mark.asyncio
+async def test_gemini_recommendation_success(
+    sample_medium_route: Route, monkeypatch: pytest.MonkeyPatch
+):
+    """When Gemini responds with valid structured JSON, ai_source is 'gemini'."""
+    fair_weather = WeatherData(
+        temperature_c=18.0,
+        precipitation_mm=0.0,
+        wind_speed_kmh=10.0,
+        weather_summary="18.0°C (mild), wind 10.0 km/h",
+    )
+
+    import httpx
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        assert "generativelanguage.googleapis.com" in str(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"recommended_mode": "bike", '
+                                        '"reasoning": "Rekomendacja Google Gemini.", '
+                                        '"estimated_duration_min": 22}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    real_async_client = httpx.AsyncClient
+
+    def mocked_async_client(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(mock_handler)
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", mocked_async_client)
+
+    rec = await get_commute_recommendation(
+        sample_medium_route,
+        fair_weather,
+        gemini_api_key="AIzaSyMockKey",
+        preferred_provider="gemini",
+    )
+
+    assert rec.ai_source == "gemini"
+    assert rec.provider == "gemini"
+    assert rec.recommended_mode == "bike"
+    assert rec.reasoning == "Rekomendacja Google Gemini."
+    assert rec.estimated_duration_min == 22
+
+
+@pytest.mark.asyncio
+async def test_claude_recommendation_success(
+    sample_medium_route: Route, monkeypatch: pytest.MonkeyPatch
+):
+    """When Claude responds with valid structured JSON, ai_source is 'claude'."""
+    fair_weather = WeatherData(
+        temperature_c=18.0,
+        precipitation_mm=0.0,
+        wind_speed_kmh=10.0,
+        weather_summary="18.0°C (mild), wind 10.0 km/h",
+    )
+
+    import httpx
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        assert "api.anthropic.com" in str(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            '```json\n{"recommended_mode": "walk", '
+                            '"reasoning": "Rekomendacja Claude.", '
+                            '"estimated_duration_min": 18}\n```'
+                        ),
+                    }
+                ]
+            },
+        )
+
+    real_async_client = httpx.AsyncClient
+
+    def mocked_async_client(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(mock_handler)
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", mocked_async_client)
+
+    rec = await get_commute_recommendation(
+        sample_medium_route,
+        fair_weather,
+        claude_api_key="sk-ant-mock",
+        preferred_provider="claude",
+    )
+
+    assert rec.ai_source == "claude"
+    assert rec.provider == "claude"
+    assert rec.recommended_mode == "walk"
+    assert rec.reasoning == "Rekomendacja Claude."
+    assert rec.estimated_duration_min == 18

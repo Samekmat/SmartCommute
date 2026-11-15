@@ -1,6 +1,7 @@
 """Pydantic v2 data transfer schemas for SmartCommute REST API contracts."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -97,11 +98,19 @@ class CommuteHistoryResponse(BaseModel):
 
 
 class AIRecommendationRequest(BaseModel):
-    """Optional payload specifying Weather Simulator overrides for recommendation testing."""
+    """Optional payload specifying Weather Simulator overrides and AI provider preference."""
 
     weather_override: WeatherOverride | None = Field(
         default=None,
         description="Simulator override preset: 'rain', 'sunny', 'windy', or 'cold'",
+    )
+    provider: Literal["auto", "gemini", "openai", "claude"] | None = Field(
+        default="auto",
+        description="Target AI provider ('auto', 'gemini', 'openai', 'claude')",
+    )
+    api_key: str | None = Field(
+        default=None,
+        description="Optional transient API key passed for current session",
     )
 
 
@@ -121,7 +130,52 @@ class AIRecommendationResponse(BaseModel):
     )
     calories_estimate: int = Field(ge=0, description="Estimated active calories burned")
     ai_source: AISource = Field(
-        description="Source of recommendation: 'llm' or 'heuristic_fallback'"
+        description="Source of recommendation: 'llm', 'gemini', 'openai', 'claude', or 'heuristic_fallback'"
+    )
+    provider: str | None = Field(
+        default=None,
+        description="Identifier of AI model/provider that generated recommendation",
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AIStatusResponse(BaseModel):
+    """Configuration status of supported AI providers on the server."""
+
+    gemini_configured: bool = Field(
+        description="True if GEMINI_API_KEY is present in environment"
+    )
+    openai_configured: bool = Field(
+        description="True if OPENAI_API_KEY is present in environment"
+    )
+    claude_configured: bool = Field(
+        description="True if ANTHROPIC_API_KEY is present in environment"
+    )
+    active_default: str = Field(
+        description="Default provider automatically chosen if none specified"
+    )
+
+
+class AIConfigRequest(BaseModel):
+    """Payload to configure or store an API key for a supported AI provider."""
+
+    provider: Literal["gemini", "openai", "claude"] = Field(
+        description="Target AI provider name"
+    )
+    api_key: str = Field(
+        min_length=1,
+        description="API key value for the provider",
+    )
+    save_to_env: bool = Field(
+        default=True,
+        description="Whether to persist key into local .env file",
+    )
+
+
+class AIConfigResponse(BaseModel):
+    """Response confirming AI provider key registration."""
+
+    provider: Literal["gemini", "openai", "claude"]
+    saved_to_env: bool
+    message: str

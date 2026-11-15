@@ -103,4 +103,54 @@ describe("AIAdvisor Component", () => {
       durationMinutes: 22,
     });
   });
+
+  it("displays Google Gemini badge when ai_source is gemini", async () => {
+    const mockGeminiRec: AIRecommendationResponse = {
+      recommended_mode: "bike",
+      weather_summary: "21°C, sunny",
+      reasoning: "Google Gemini recommendation.",
+      estimated_duration_min: 19,
+      potential_co2_saved_kg: 1.1,
+      calories_estimate: 210,
+      ai_source: "gemini",
+    };
+
+    const onRequest = vi.fn().mockResolvedValue(mockGeminiRec);
+
+    render(
+      <AIAdvisor
+        selectedRoute={mockRoute}
+        onRequestRecommendation={onRequest}
+        onApplyToLogger={vi.fn()}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Get AI Recommendation/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Google Gemini (Free)")).toBeDefined();
+    });
+  });
+
+  it("opens AI provider configuration modal when settings button is clicked", async () => {
+    render(
+      <AIAdvisor
+        selectedRoute={mockRoute}
+        onRequestRecommendation={vi.fn()}
+        onApplyToLogger={vi.fn()}
+      />
+    );
+
+    const configBtn = screen.getByRole("button", {
+      name: /Konfiguracja modeli AI i kluczy API/i,
+    });
+    fireEvent.click(configBtn);
+
+    expect(
+      screen.getByText("Konfiguracja Modeli AI i Kluczy API")
+    ).toBeDefined();
+    expect(screen.getByText(/Google AI Studio/i)).toBeDefined();
+  });
 });

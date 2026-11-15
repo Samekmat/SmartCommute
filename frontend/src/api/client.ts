@@ -6,10 +6,16 @@
 
 import { z } from "zod";
 import {
+  AIConfigRequest,
+  AIConfigRequestSchema,
+  AIConfigResponse,
+  AIConfigResponseSchema,
   AIRecommendationRequest,
   AIRecommendationRequestSchema,
   AIRecommendationResponse,
   AIRecommendationResponseSchema,
+  AIStatusResponse,
+  AIStatusResponseSchema,
   CommuteHistoryResponse,
   CommuteHistoryResponseSchema,
   CommuteLog,
@@ -260,6 +266,31 @@ export function createApiClient(
         body: JSON.stringify(validatedPayload),
       });
       return validateResponse(AIRecommendationResponseSchema, raw);
+    },
+
+    /**
+     * Retrieve server-side configured AI provider status.
+     *
+     * @returns Status of configured providers.
+     */
+    async getAIStatus(): Promise<AIStatusResponse> {
+      const raw = await requestRaw("/api/ai/status", { method: "GET" });
+      return validateResponse(AIStatusResponseSchema, raw);
+    },
+
+    /**
+     * Configure or store an API key for a specified AI provider.
+     *
+     * @param payload - Target provider, API key, and persistence flag.
+     * @returns Confirmation response from server.
+     */
+    async saveAIConfig(payload: AIConfigRequest): Promise<AIConfigResponse> {
+      const validatedPayload = AIConfigRequestSchema.parse(payload);
+      const raw = await requestRaw("/api/ai/config", {
+        method: "POST",
+        body: JSON.stringify(validatedPayload),
+      });
+      return validateResponse(AIConfigResponseSchema, raw);
     },
   };
 }

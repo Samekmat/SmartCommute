@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Sparkles,
   CloudSun,
@@ -10,10 +10,14 @@ import {
   ArrowRight,
   AlertCircle,
   Loader2,
+  Settings,
 } from "lucide-react";
+import { api } from "../../api/client";
 import {
+  AIProvider,
   AIRecommendationRequest,
   AIRecommendationResponse,
+  AIStatusResponse,
   AsyncState,
   CommutePrefill,
   errorState,
@@ -25,6 +29,7 @@ import {
 } from "../../types/commute";
 import { TransportBadge } from "../common/TransportBadge";
 import { TransportIcon } from "../common/TransportIcon";
+import { AIConfigModal } from "./AIConfigModal";
 
 /**
  * Properties for the AIAdvisor component.
@@ -62,6 +67,41 @@ export function AIAdvisor({
     useState<WeatherOption>("live");
   const [advisorState, setAdvisorState] =
     useState<AsyncState<AIRecommendationResponse>>(idleState());
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
+  const [activeProvider, setActiveProvider] = useState<AIProvider>("auto");
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [serverStatus, setServerStatus] = useState<AIStatusResponse | null>(
+    null
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    api
+      .getAIStatus()
+      .then((status) => {
+        if (isMounted) setServerStatus(status);
+      })
+      .catch(() => {
+        // Server might be offline or starting up; graceful silent ignore
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function handleSaveProviderKey(
+    provider: "gemini" | "openai" | "claude",
+    apiKey: string,
+    saveToEnv: boolean
+  ) {
+    await api.saveAIConfig({
+      provider,
+      api_key: apiKey,
+      save_to_env: saveToEnv,
+    });
+    const refreshed = await api.getAIStatus();
+    setServerStatus(refreshed);
+  }
 
   async function handleFetchRecommendation() {
     if (!selectedRoute) {
@@ -72,9 +112,12 @@ export function AIAdvisor({
     try {
       setAdvisorState(loadingState());
       const override = weatherCondition === "live" ? null : weatherCondition;
-      const response = await onRequestRecommendation(selectedRoute.id, {
+      const payload: AIRecommendationRequest = {
         weather_override: override,
-      });
+        ...(activeProvider !== "auto" ? { provider: activeProvider } : {}),
+        ...(sessionKey ? { api_key: sessionKey } : {}),
+      };
+      const response = await onRequestRecommendation(selectedRoute.id, payload);
       setAdvisorState(successState(response));
     } catch (err: unknown) {
       const msg =
@@ -104,6 +147,19 @@ export function AIAdvisor({
             </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsConfigModalOpen(true)}
+          aria-label="Konfiguracja modeli AI i kluczy API"
+          title="Konfiguracja modeli AI i kluczy API"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-lg transition-colors shadow-2xs"
+        >
+          <Settings className="h-3.5 w-3.5 text-slate-500" />
+          <span className="capitalize">
+            {activeProvider === "auto" ? "AI: Auto" : `AI: ${activeProvider}`}
+          </span>
+        </button>
       </div>
 
       <div className="space-y-3.5 mb-5 p-3.5 bg-slate-50 rounded-lg border border-slate-200/80">
@@ -215,17 +271,43 @@ export function AIAdvisor({
               <span className="text-[11px] font-semibold text-indigo-900 uppercase tracking-wider">
                 Recommended Mode
               </span>
-              {advisorState.data.ai_source === "llm" ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                  <Bot className="h-3 w-3" />
-                  <span>OpenAI LLM</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  <Cpu className="h-3 w-3" />
-                  <span>Zero-Config Fallback</span>
-                </span>
-              )}
+              {(() => {
+                switch (advisorState.data.ai_source) {
+                  case "gemini":
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                        <Sparkles className="h-3 w-3" />
+                        <span>Google Gemini (Free)</span>
+                      </span>
+                    );
+                  case "claude":
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                        <Bot className="h-3 w-3" />
+                        <span>Claude Haiku</span>
+                      </span>
+                    );
+                  case "llm":
+                  case "openai":
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                        <Bot className="h-3 w-3" />
+                        <span>OpenAI LLM</span>
+                      </span>
+                    );
+                  case "heuristic_fallback":
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <Cpu className="h-3 w-3" />
+                        <span>Zero-Config Fallback</span>
+                      </span>
+                    );
+                  default: {
+                    const _exhaustiveCheck: never = advisorState.data.ai_source;
+                    return _exhaustiveCheck;
+                  }
+                }
+              })()}
             </div>
 
             <div className="flex items-center gap-3">
@@ -297,6 +379,17 @@ export function AIAdvisor({
           </div>
         </div>
       )}
+
+      <AIConfigModal
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        serverStatus={serverStatus}
+        activeProvider={activeProvider}
+        onSelectProvider={(p) => setActiveProvider(p)}
+        onSaveKey={handleSaveProviderKey}
+        sessionKey={sessionKey}
+        onSetSessionKey={(k) => setSessionKey(k)}
+      />
     </div>
   );
 }

@@ -258,6 +258,51 @@ describe("ApiClient", () => {
     });
   });
 
+  describe("AI Configuration API", () => {
+    it("fetches and validates AI provider status", async () => {
+      const mockStatus = {
+        gemini_configured: true,
+        openai_configured: false,
+        claude_configured: false,
+        active_default: "gemini",
+      };
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => mockStatus,
+      });
+
+      const res = await client.getAIStatus();
+      expect(res.gemini_configured).toBe(true);
+      expect(res.active_default).toBe("gemini");
+    });
+
+    it("saves AI configuration key and validates response", async () => {
+      const mockResponse = {
+        provider: "gemini",
+        saved_to_env: true,
+        message: "Key saved successfully",
+      };
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => mockResponse,
+      });
+
+      const res = await client.saveAIConfig({
+        provider: "gemini",
+        api_key: "AIzaSyMockKey",
+        save_to_env: true,
+      });
+      expect(res.provider).toBe("gemini");
+      expect(res.saved_to_env).toBe(true);
+    });
+  });
+
   describe("HTTP & Network Error Handling", () => {
     it("throws ApiClientError with backend message on HTTP 404", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({

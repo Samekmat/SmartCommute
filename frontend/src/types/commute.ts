@@ -37,9 +37,22 @@ export type WeatherOverride = z.infer<typeof WeatherOverrideSchema>;
 /**
  * Origin source indicator for AI recommendation generation.
  */
-export const AISourceSchema = z.enum(["llm", "heuristic_fallback"]);
+export const AISourceSchema = z.enum([
+  "llm",
+  "heuristic_fallback",
+  "gemini",
+  "openai",
+  "claude",
+]);
 
 export type AISource = z.infer<typeof AISourceSchema>;
+
+/**
+ * Supported external AI providers.
+ */
+export const AIProviderSchema = z.enum(["auto", "gemini", "openai", "claude"]);
+
+export type AIProvider = z.infer<typeof AIProviderSchema>;
 
 /**
  * Complete representation of a Commute Route returned by the backend REST API.
@@ -134,6 +147,8 @@ export type CommuteHistoryResponse = z.infer<
  */
 export const AIRecommendationRequestSchema = z.object({
   weather_override: WeatherOverrideSchema.nullable().optional(),
+  provider: AIProviderSchema.optional(),
+  api_key: z.string().optional(),
 });
 
 export type AIRecommendationRequest = z.infer<
@@ -151,11 +166,46 @@ export const AIRecommendationResponseSchema = z.object({
   potential_co2_saved_kg: z.number().nonnegative(),
   calories_estimate: z.number().int().nonnegative(),
   ai_source: AISourceSchema,
+  provider: z.string().nullable().optional(),
 });
 
 export type AIRecommendationResponse = z.infer<
   typeof AIRecommendationResponseSchema
 >;
+
+/**
+ * Configuration status of supported AI providers returned by backend.
+ */
+export const AIStatusResponseSchema = z.object({
+  gemini_configured: z.boolean(),
+  openai_configured: z.boolean(),
+  claude_configured: z.boolean(),
+  active_default: z.string(),
+});
+
+export type AIStatusResponse = z.infer<typeof AIStatusResponseSchema>;
+
+/**
+ * Request payload to configure an API key for an AI provider.
+ */
+export const AIConfigRequestSchema = z.object({
+  provider: z.enum(["gemini", "openai", "claude"]),
+  api_key: z.string().min(1),
+  save_to_env: z.boolean().default(true),
+});
+
+export type AIConfigRequest = z.infer<typeof AIConfigRequestSchema>;
+
+/**
+ * Response payload confirming AI configuration update.
+ */
+export const AIConfigResponseSchema = z.object({
+  provider: z.enum(["gemini", "openai", "claude"]),
+  saved_to_env: z.boolean(),
+  message: z.string(),
+});
+
+export type AIConfigResponse = z.infer<typeof AIConfigResponseSchema>;
 
 /**
  * Transfer payload pre-filling the Commute Logger from AI Advisor recommendations.

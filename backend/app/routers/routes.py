@@ -176,5 +176,32 @@ async def recommend_commute_mode(
         weather_override=override,
     )
 
-    recommendation = await get_commute_recommendation(route, weather)
+    provider = request.provider if request and request.provider else "auto"
+    api_key = (
+        request.api_key.strip()
+        if request and request.api_key and request.api_key.strip()
+        else None
+    )
+
+    openai_key = api_key if provider == "openai" else None
+    gemini_key = api_key if provider == "gemini" else None
+    claude_key = api_key if provider == "claude" else None
+
+    # If provider is "auto" and an api_key is supplied, determine by prefix
+    if provider == "auto" and api_key:
+        if api_key.startswith("AIza"):
+            gemini_key = api_key
+        elif api_key.startswith("sk-ant"):
+            claude_key = api_key
+        else:
+            openai_key = api_key
+
+    recommendation = await get_commute_recommendation(
+        route,
+        weather,
+        openai_api_key=openai_key,
+        gemini_api_key=gemini_key,
+        claude_api_key=claude_key,
+        preferred_provider=provider,
+    )
     return AIRecommendationResponse.model_validate(recommendation)

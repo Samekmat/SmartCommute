@@ -1,10 +1,10 @@
-"""AI Advisor commute recommendation service with Zero-Config heuristic fallback."""
+"""AI Advisor commute recommendation service supporting Gemini, OpenAI, Claude and Zero-Config fallback."""
 
 import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 import httpx
 
@@ -14,7 +14,8 @@ from app.services.weather import WeatherData
 
 logger = logging.getLogger(__name__)
 
-AISource = Literal["llm", "heuristic_fallback"]
+AISource = Literal["llm", "heuristic_fallback", "gemini", "openai", "claude"]
+LLMProvider = Literal["auto", "gemini", "openai", "claude"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,7 @@ class AIRecommendation:
     potential_co2_saved_kg: float
     calories_estimate: int
     ai_source: AISource
+    provider: str | None = None
 
 
 def _estimate_duration_minutes(mode: TransportMode, distance_km: float) -> int:
@@ -140,17 +142,24 @@ def _heuristic_recommendation(route: Route, weather: WeatherData) -> AIRecommend
         potential_co2_saved_kg=eco.co2_saved_kg,
         calories_estimate=eco.calories_burned,
         ai_source="heuristic_fallback",
+        provider="heuristic_fallback",
     )
 
 
-OPENAI_COMPLETIONS_URL: Final[str] = "https://api.openai.com/v1/chat/completions"
+def _clean_json_content(raw: str) -> str:
+    """Strip markdown code fence blocks if returned by the LLM."""
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if len(lines) >= 2:
+            cleaned = "\n".join(lines[1:])
+        cleaned = cleaned.removesuffix("```")
+    return cleaned.strip()
 
 
-async def _query_llm_recommendation(
-    route: Route, weather: WeatherData, api_key: str
-) -> AIRecommendation:
-    """Request structured recommendation from OpenAI LLM."""
-    prompt = (
+def _build_prompt(route: Route, weather: WeatherData) -> str:
+    """Construct prompt for structured LLM commute recommendation."""
+    return (
         f"Route: '{route.name}' from '{route.origin}' to '{route.destination}', distance {route.distance_km} km. "
         f"Preferred transport: {route.preferred_transport}. "
         f"Current weather: temperature {weather.temperature_c}°C, precipitation {weather.precipitation_mm} mm, "
@@ -162,6 +171,19 @@ async def _query_llm_recommendation(
         "- estimated_duration_min: estimated integer minutes"
     )
 
+
+OPENAI_COMPLETIONS_URL: Final[str] = "https://api.openai.com/v1/chat/completions"
+GEMINI_GENERATE_URL: Final[str] = (
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+)
+CLAUDE_MESSAGES_URL: Final[str] = "https://api.anthropic.com/v1/messages"
+
+
+async def _query_openai_recommendation(
+    route: Route, weather: WeatherData, api_key: str
+) -> AIRecommendation:
+    """Request structured recommendation from OpenAI LLM."""
+    prompt = _build_prompt(route, weather)
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -186,12 +208,11 @@ async def _query_llm_recommendation(
         response.raise_for_status()
         data = response.json()
         content = data["choices"][0]["message"]["content"]
-        parsed = json.loads(content)
+        parsed = json.loads(_clean_json_content(content))
 
     mode: TransportMode = parsed["recommended_mode"]
     reasoning: str = parsed.get("reasoning", "Rekomendacja AI.")
     duration: int = int(parsed.get("estimated_duration_min", 20))
-
     eco = calculate_eco_metrics(mode, route.distance_km)
 
     return AIRecommendation(
@@ -202,13 +223,123 @@ async def _query_llm_recommendation(
         potential_co2_saved_kg=eco.co2_saved_kg,
         calories_estimate=eco.calories_burned,
         ai_source="llm",
+        provider="openai",
     )
+
+
+async def _query_gemini_recommendation(
+    route: Route, weather: WeatherData, api_key: str
+) -> AIRecommendation:
+    """Request structured recommendation from Google Gemini."""
+    prompt = _build_prompt(route, weather)
+    url = f"{GEMINI_GENERATE_URL}?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "temperature": 0.2,
+        },
+    }
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        response = await client.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+        parsed = json.loads(_clean_json_content(raw_text))
+
+    mode: TransportMode = parsed["recommended_mode"]
+    reasoning: str = parsed.get("reasoning", "Rekomendacja Google Gemini.")
+    duration: int = int(parsed.get("estimated_duration_min", 20))
+    eco = calculate_eco_metrics(mode, route.distance_km)
+
+    return AIRecommendation(
+        recommended_mode=mode,
+        weather_summary=weather.weather_summary,
+        reasoning=reasoning,
+        estimated_duration_min=max(1, duration),
+        potential_co2_saved_kg=eco.co2_saved_kg,
+        calories_estimate=eco.calories_burned,
+        ai_source="gemini",
+        provider="gemini",
+    )
+
+
+async def _query_claude_recommendation(
+    route: Route, weather: WeatherData, api_key: str
+) -> AIRecommendation:
+    """Request structured recommendation from Anthropic Claude."""
+    prompt = _build_prompt(route, weather)
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "claude-3-5-haiku-20241022",
+        "max_tokens": 500,
+        "temperature": 0.2,
+        "system": (
+            "You are SmartCommute AI advisor recommending eco-friendly transport modes "
+            "based on live weather. Respond strictly in valid JSON format without markdown fences."
+        ),
+        "messages": [{"role": "user", "content": prompt}],
+    }
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        response = await client.post(CLAUDE_MESSAGES_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        raw_text = data["content"][0]["text"]
+        parsed = json.loads(_clean_json_content(raw_text))
+
+    mode: TransportMode = parsed["recommended_mode"]
+    reasoning: str = parsed.get("reasoning", "Rekomendacja Claude.")
+    duration: int = int(parsed.get("estimated_duration_min", 20))
+    eco = calculate_eco_metrics(mode, route.distance_km)
+
+    return AIRecommendation(
+        recommended_mode=mode,
+        weather_summary=weather.weather_summary,
+        reasoning=reasoning,
+        estimated_duration_min=max(1, duration),
+        potential_co2_saved_kg=eco.co2_saved_kg,
+        calories_estimate=eco.calories_burned,
+        ai_source="claude",
+        provider="claude",
+    )
+
+
+def get_ai_status() -> dict[str, Any]:
+    """Inspect environment configuration and determine active AI provider status."""
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    claude_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+
+    active_default = "heuristic_fallback"
+    if gemini_key:
+        active_default = "gemini"
+    elif openai_key:
+        active_default = "openai"
+    elif claude_key:
+        active_default = "claude"
+
+    return {
+        "gemini_configured": bool(gemini_key),
+        "openai_configured": bool(openai_key),
+        "claude_configured": bool(claude_key),
+        "active_default": active_default,
+    }
 
 
 async def get_commute_recommendation(
     route: Route,
     weather: WeatherData,
     openai_api_key: str | None = None,
+    gemini_api_key: str | None = None,
+    claude_api_key: str | None = None,
+    preferred_provider: LLMProvider = "auto",
 ) -> AIRecommendation:
     """Generate commute recommendation via LLM if key present, else Zero-Config fallback.
 
@@ -220,25 +351,84 @@ async def get_commute_recommendation(
         Live or simulated atmospheric conditions.
     openai_api_key : str | None
         Optional OpenAI API key; defaults to OPENAI_API_KEY environment variable.
+    gemini_api_key : str | None
+        Optional Google Gemini API key; defaults to GEMINI_API_KEY environment variable.
+    claude_api_key : str | None
+        Optional Anthropic Claude API key; defaults to ANTHROPIC_API_KEY environment variable.
+    preferred_provider : LLMProvider
+        Preferred provider ('auto', 'gemini', 'openai', 'claude').
 
     Returns
     -------
     AIRecommendation
         Complete structured recommendation with justification and eco impact.
     """
-    effective_key = (
-        openai_api_key if openai_api_key is not None else os.getenv("OPENAI_API_KEY")
+    eff_gemini = (
+        gemini_api_key
+        if gemini_api_key is not None
+        else os.getenv("GEMINI_API_KEY", "").strip()
+    )
+    eff_openai = (
+        openai_api_key
+        if openai_api_key is not None
+        else os.getenv("OPENAI_API_KEY", "").strip()
+    )
+    eff_claude = (
+        claude_api_key
+        if claude_api_key is not None
+        else os.getenv("ANTHROPIC_API_KEY", "").strip()
     )
 
-    if effective_key and effective_key.strip():
+    # 1. Direct provider selection
+    if preferred_provider == "gemini" and eff_gemini:
         try:
-            return await _query_llm_recommendation(
-                route, weather, effective_key.strip()
-            )
+            return await _query_gemini_recommendation(route, weather, eff_gemini)
         except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-            logger.warning(
-                "OpenAI LLM recommendation failed (%s); seamlessly using Zero-Config fallback.",
-                exc,
-            )
+            logger.warning("Gemini recommendation failed (%s); fallback.", exc)
 
+    if preferred_provider == "openai" and eff_openai:
+        try:
+            return await _query_openai_recommendation(route, weather, eff_openai)
+        except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
+            logger.warning("OpenAI recommendation failed (%s); fallback.", exc)
+
+    if preferred_provider == "claude" and eff_claude:
+        try:
+            return await _query_claude_recommendation(route, weather, eff_claude)
+        except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
+            logger.warning("Claude recommendation failed (%s); fallback.", exc)
+
+    # 2. Auto selection order
+    if preferred_provider == "auto":
+        # If openai key was explicitly provided (e.g. In unit tests), honor it first
+        if openai_api_key and openai_api_key.strip():
+            try:
+                return await _query_openai_recommendation(
+                    route, weather, openai_api_key.strip()
+                )
+            except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
+                logger.warning("OpenAI recommendation failed (%s); fallback.", exc)
+
+        # Then Google Gemini (free tier first)
+        if eff_gemini:
+            try:
+                return await _query_gemini_recommendation(route, weather, eff_gemini)
+            except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
+                logger.warning("Gemini recommendation failed (%s); fallback.", exc)
+
+        # Then OpenAI
+        if eff_openai:
+            try:
+                return await _query_openai_recommendation(route, weather, eff_openai)
+            except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
+                logger.warning("OpenAI recommendation failed (%s); fallback.", exc)
+
+        # Then Claude
+        if eff_claude:
+            try:
+                return await _query_claude_recommendation(route, weather, eff_claude)
+            except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
+                logger.warning("Claude recommendation failed (%s); fallback.", exc)
+
+    # 3. Deterministic Zero-Config heuristic fallback
     return _heuristic_recommendation(route, weather)
