@@ -174,7 +174,7 @@ def _build_prompt(route: Route, weather: WeatherData) -> str:
 
 OPENAI_COMPLETIONS_URL: Final[str] = "https://api.openai.com/v1/chat/completions"
 GEMINI_GENERATE_URL: Final[str] = (
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
 )
 CLAUDE_MESSAGES_URL: Final[str] = "https://api.anthropic.com/v1/messages"
 
@@ -384,19 +384,22 @@ async def get_commute_recommendation(
         try:
             return await _query_gemini_recommendation(route, weather, eff_gemini)
         except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-            logger.warning("Gemini recommendation failed (%s); fallback.", exc)
+            err_detail = getattr(getattr(exc, "response", None), "text", str(exc))
+            logger.warning("Gemini recommendation failed (%s); fallback.", err_detail)
 
     if preferred_provider == "openai" and eff_openai:
         try:
             return await _query_openai_recommendation(route, weather, eff_openai)
         except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-            logger.warning("OpenAI recommendation failed (%s); fallback.", exc)
+            err_detail = getattr(getattr(exc, "response", None), "text", str(exc))
+            logger.warning("OpenAI recommendation failed (%s); fallback.", err_detail)
 
     if preferred_provider == "claude" and eff_claude:
         try:
             return await _query_claude_recommendation(route, weather, eff_claude)
         except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-            logger.warning("Claude recommendation failed (%s); fallback.", exc)
+            err_detail = getattr(getattr(exc, "response", None), "text", str(exc))
+            logger.warning("Claude recommendation failed (%s); fallback.", err_detail)
 
     # 2. Auto selection order
     if preferred_provider == "auto":
@@ -407,28 +410,40 @@ async def get_commute_recommendation(
                     route, weather, openai_api_key.strip()
                 )
             except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-                logger.warning("OpenAI recommendation failed (%s); fallback.", exc)
+                err_detail = getattr(getattr(exc, "response", None), "text", str(exc))
+                logger.warning(
+                    "OpenAI recommendation failed (%s); fallback.", err_detail
+                )
 
         # Then Google Gemini (free tier first)
         if eff_gemini:
             try:
                 return await _query_gemini_recommendation(route, weather, eff_gemini)
             except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-                logger.warning("Gemini recommendation failed (%s); fallback.", exc)
+                err_detail = getattr(getattr(exc, "response", None), "text", str(exc))
+                logger.warning(
+                    "Gemini recommendation failed (%s); fallback.", err_detail
+                )
 
         # Then OpenAI
         if eff_openai:
             try:
                 return await _query_openai_recommendation(route, weather, eff_openai)
             except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-                logger.warning("OpenAI recommendation failed (%s); fallback.", exc)
+                err_detail = getattr(getattr(exc, "response", None), "text", str(exc))
+                logger.warning(
+                    "OpenAI recommendation failed (%s); fallback.", err_detail
+                )
 
         # Then Claude
         if eff_claude:
             try:
                 return await _query_claude_recommendation(route, weather, eff_claude)
             except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError) as exc:
-                logger.warning("Claude recommendation failed (%s); fallback.", exc)
+                err_detail = getattr(getattr(exc, "response", None), "text", str(exc))
+                logger.warning(
+                    "Claude recommendation failed (%s); fallback.", err_detail
+                )
 
     # 3. Deterministic Zero-Config heuristic fallback
     return _heuristic_recommendation(route, weather)
