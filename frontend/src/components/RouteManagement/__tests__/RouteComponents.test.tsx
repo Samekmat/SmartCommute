@@ -126,16 +126,28 @@ describe("RouteModal Component", () => {
     expect(screen.getByDisplayValue("Home to Office")).toBeDefined();
   });
 
-  it("renders geocoding quick buttons in RouteModal", () => {
+  it("renders geocoding quick buttons and toggles advanced weather coordinates", () => {
     render(<RouteModal isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />);
 
     const fetchButtons = screen.getAllByRole("button", {
       name: /Pobierz współrzędne/i,
     });
     expect(fetchButtons.length).toBe(2);
+
+    // Advanced weather coordinates are collapsed by default
+    const toggleButton = screen.getByRole("button", {
+      name: /Zaawansowane: Lokalizacja stacji pogodowej/i,
+    });
+    expect(toggleButton).toBeDefined();
+
+    // Expand the accordion
+    fireEvent.click(toggleButton);
+
     expect(
       screen.getByRole("button", { name: /Moja lokalizacja \(GPS\)/i })
     ).toBeDefined();
     expect(screen.getByRole("button", { name: /Wykryj adres/i })).toBeDefined();
+    expect(screen.getByLabelText(/Latitude/i)).toBeDefined();
+    expect(screen.getByLabelText(/Longitude/i)).toBeDefined();
   });
 });

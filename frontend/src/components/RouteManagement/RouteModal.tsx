@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { X, Loader2, MapPin, Navigation, RotateCw } from "lucide-react";
+import {
+  X,
+  Loader2,
+  MapPin,
+  Navigation,
+  RotateCw,
+  ChevronDown,
+  ChevronUp,
+  Info,
+} from "lucide-react";
 import { api } from "../../api/client";
 import {
   AsyncState,
@@ -55,6 +64,7 @@ export function RouteModal({
   const [isSearchingGeo, setIsSearchingGeo] = useState<boolean>(false);
   const [isReverseGeo, setIsReverseGeo] = useState<boolean>(false);
   const [isGpsLoading, setIsGpsLoading] = useState<boolean>(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
   const [geoResults, setGeoResults] = useState<LocationSearchResult[]>([]);
   const [geoSearchTarget, setGeoSearchTarget] = useState<
     "origin" | "destination" | null
@@ -79,11 +89,39 @@ export function RouteModal({
       setLongitude("19.9450");
       setPreferredTransport("bike");
     }
+    setIsAdvancedOpen(false);
     setSaveState(idleState());
     setGeoResults([]);
     setGeoSearchTarget(null);
     setGeoNotice(null);
   }, [routeToEdit, isOpen]);
+
+  /**
+   * Performs a quiet background geocode lookup when origin field loses focus,
+   * provided the origin is non-empty and coordinates are still at default Kraków values.
+   */
+  async function handleOriginBlur() {
+    const trimmed = origin.trim();
+    if (
+      trimmed.length >= 3 &&
+      latitude === "50.0647" &&
+      longitude === "19.9450"
+    ) {
+      try {
+        const results = await api.searchLocations(trimmed, 1);
+        if (results.length > 0 && results[0]) {
+          const item = results[0];
+          setLatitude(item.latitude.toFixed(4));
+          setLongitude(item.longitude.toFixed(4));
+          setGeoNotice(
+            `Automatycznie ustawiono punkt pogodowy: ${item.display_name}`
+          );
+        }
+      } catch {
+        // Silent fallback - manual trigger and advanced inputs remain available
+      }
+    }
+  }
 
   async function handleSearchCoords(target: "origin" | "destination") {
     const text = target === "origin" ? origin.trim() : destination.trim();
@@ -106,7 +144,9 @@ export function RouteModal({
         const item = results[0];
         setLatitude(item.latitude.toFixed(4));
         setLongitude(item.longitude.toFixed(4));
-        setGeoNotice(`Ustawiono współrzędne dla: ${item.display_name}`);
+        setGeoNotice(
+          `Ustawiono współrzędne pogodowe dla: ${item.display_name}`
+        );
         setGeoResults([]);
         setGeoSearchTarget(null);
       } else {
@@ -128,7 +168,7 @@ export function RouteModal({
     } else if (geoSearchTarget === "destination") {
       setDestination(item.name);
     }
-    setGeoNotice(`Wybrano: ${item.display_name}`);
+    setGeoNotice(`Ustawiono punkt pogodowy: ${item.display_name}`);
     setGeoResults([]);
     setGeoSearchTarget(null);
   }
@@ -216,6 +256,7 @@ export function RouteModal({
     }
 
     if (Number.isNaN(parsedLat) || Number.isNaN(parsedLon)) {
+      setIsAdvancedOpen(true);
       setSaveState(errorState("Latitude and Longitude must be valid numbers."));
       return;
     }
@@ -351,6 +392,7 @@ export function RouteModal({
                   setOrigin(e.target.value);
                   setSaveState(idleState());
                 }}
+                onBlur={handleOriginBlur}
                 placeholder="e.g. Kraków Rynek"
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
@@ -369,7 +411,7 @@ export function RouteModal({
                   onClick={() => handleSearchCoords("destination")}
                   disabled={isSearchingGeo}
                   className="text-[11px] text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 font-medium disabled:opacity-50"
-                  title="Wyszukaj współrzędne dla celu podróży"
+                  title="Wyszukaj i ustaw współrzędne pogodowe dla celu podróży"
                 >
                   {isSearchingGeo && geoSearchTarget === "destination" ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -398,7 +440,7 @@ export function RouteModal({
           {geoResults.length > 0 && (
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
               <span className="text-[11px] font-semibold text-slate-700 block">
-                Wybierz dokładną lokalizację:
+                Wybierz dokładną lokalizację dla prognozy pogody:
               </span>
               <div className="space-y-1 max-h-36 overflow-y-auto">
                 {geoResults.map((item, idx) => (
@@ -420,107 +462,26 @@ export function RouteModal({
             </div>
           )}
 
-          {/* Quick coordinate tools */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-medium text-slate-700">
-              Współrzędne trasy
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleUseGps}
-                disabled={isGpsLoading}
-                className="text-[11px] text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors disabled:opacity-50"
-                title="Wczytaj pozycję z GPS przeglądarki"
-              >
-                {isGpsLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Navigation className="h-3 w-3" />
-                )}
-                <span>📍 Moja lokalizacja (GPS)</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleReverseGeocode}
-                disabled={isReverseGeo}
-                className="text-[11px] text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors disabled:opacity-50"
-                title="Wykryj adres z wpisanych współrzędnych"
-              >
-                {isReverseGeo ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <RotateCw className="h-3 w-3" />
-                )}
-                <span>Wykryj adres</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label
-                htmlFor="route-distance"
-                className="block text-xs font-medium text-slate-700 mb-1"
-              >
-                Distance (km)
-              </label>
-              <input
-                id="route-distance"
-                type="number"
-                step="0.1"
-                min="0.1"
-                required
-                value={distanceKm}
-                onChange={(e) => {
-                  setDistanceKm(e.target.value);
-                  setSaveState(idleState());
-                }}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="route-latitude"
-                className="block text-xs font-medium text-slate-700 mb-1"
-              >
-                Latitude
-              </label>
-              <input
-                id="route-latitude"
-                type="number"
-                step="0.0001"
-                required
-                value={latitude}
-                onChange={(e) => {
-                  setLatitude(e.target.value);
-                  setSaveState(idleState());
-                }}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="route-longitude"
-                className="block text-xs font-medium text-slate-700 mb-1"
-              >
-                Longitude
-              </label>
-              <input
-                id="route-longitude"
-                type="number"
-                step="0.0001"
-                required
-                value={longitude}
-                onChange={(e) => {
-                  setLongitude(e.target.value);
-                  setSaveState(idleState());
-                }}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-            </div>
+          <div>
+            <label
+              htmlFor="route-distance"
+              className="block text-xs font-medium text-slate-700 mb-1"
+            >
+              Distance (km)
+            </label>
+            <input
+              id="route-distance"
+              type="number"
+              step="0.1"
+              min="0.1"
+              required
+              value={distanceKm}
+              onChange={(e) => {
+                setDistanceKm(e.target.value);
+                setSaveState(idleState());
+              }}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            />
           </div>
 
           <div>
@@ -534,6 +495,127 @@ export function RouteModal({
                 setSaveState(idleState());
               }}
             />
+          </div>
+
+          {/* Collapsible Advanced Weather Coordinates Section */}
+          <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/50">
+            <button
+              type="button"
+              onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+              className="w-full px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-slate-100/70 transition-colors"
+              aria-expanded={isAdvancedOpen}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="text-xs font-semibold text-slate-700 truncate">
+                  Zaawansowane: Lokalizacja stacji pogodowej
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
+                  {Number(latitude).toFixed(4)}, {Number(longitude).toFixed(4)}
+                </span>
+                {isAdvancedOpen ? (
+                  <ChevronUp className="h-4 w-4 text-slate-400" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                )}
+              </div>
+            </button>
+
+            {isAdvancedOpen && (
+              <div className="p-3.5 pt-2 border-t border-slate-200 bg-white space-y-3">
+                <div className="flex items-start gap-2 p-2.5 text-xs text-slate-600 bg-slate-50 rounded-md border border-slate-200">
+                  <Info className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" />
+                  <span>
+                    Współrzędne geograficzne są wykorzystywane przez{" "}
+                    <strong>Doradcę AI</strong> do pobierania aktualnych
+                    warunków pogodowych z Open-Meteo dla tej trasy (domyślnie
+                    punkt początkowy).
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                  <span className="text-xs font-medium text-slate-700">
+                    Narzędzia współrzędnych
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleUseGps}
+                      disabled={isGpsLoading}
+                      className="text-[11px] text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors disabled:opacity-50"
+                      title="Wczytaj pozycję z GPS przeglądarki"
+                    >
+                      {isGpsLoading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Navigation className="h-3 w-3" />
+                      )}
+                      <span>📍 Moja lokalizacja (GPS)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReverseGeocode}
+                      disabled={isReverseGeo}
+                      className="text-[11px] text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors disabled:opacity-50"
+                      title="Wykryj adres z wpisanych współrzędnych"
+                    >
+                      {isReverseGeo ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCw className="h-3 w-3" />
+                      )}
+                      <span>Wykryj adres</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="route-latitude"
+                      className="block text-xs font-medium text-slate-700 mb-1"
+                    >
+                      Latitude (szerokość)
+                    </label>
+                    <input
+                      id="route-latitude"
+                      type="number"
+                      step="0.0001"
+                      required
+                      value={latitude}
+                      onChange={(e) => {
+                        setLatitude(e.target.value);
+                        setSaveState(idleState());
+                      }}
+                      className="w-full px-3 py-1.5 text-xs font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="route-longitude"
+                      className="block text-xs font-medium text-slate-700 mb-1"
+                    >
+                      Longitude (długość)
+                    </label>
+                    <input
+                      id="route-longitude"
+                      type="number"
+                      step="0.0001"
+                      required
+                      value={longitude}
+                      onChange={(e) => {
+                        setLongitude(e.target.value);
+                        setSaveState(idleState());
+                      }}
+                      className="w-full px-3 py-1.5 text-xs font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
