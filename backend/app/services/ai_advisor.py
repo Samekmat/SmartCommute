@@ -47,6 +47,9 @@ def _estimate_duration_minutes(mode: TransportMode, distance_km: float) -> int:
         case "car":
             # Urban traffic ~35 km/h plus 3-min parking/setup
             return max(3, round(distance_km / 35.0 * 60) + 3)
+        case _:
+            # Fallback estimation for unexpected transport mode (~20 km/h)
+            return max(1, round(distance_km / 20.0 * 60))
 
 
 def _heuristic_recommendation(route: Route, weather: WeatherData) -> AIRecommendation:

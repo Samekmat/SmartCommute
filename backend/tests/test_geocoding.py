@@ -29,7 +29,7 @@ async def test_search_locations_success(monkeypatch: pytest.MonkeyPatch):
     ]
 
     async def mock_handler(request: httpx.Request) -> httpx.Response:
-        assert "nominatim.openstreetmap.org" in str(request.url)
+        assert request.url.host == "nominatim.openstreetmap.org"
         assert "q=Krakow" in str(request.url) or "q=Krak%C3%B3w" in str(request.url)
         return httpx.Response(200, json=mock_response)
 
@@ -86,7 +86,7 @@ async def test_reverse_geocode_success(monkeypatch: pytest.MonkeyPatch):
     }
 
     async def mock_handler(request: httpx.Request) -> httpx.Response:
-        assert "nominatim.openstreetmap.org" in str(request.url)
+        assert request.url.host == "nominatim.openstreetmap.org"
         return httpx.Response(200, json=mock_response)
 
     real_async_client = httpx.AsyncClient

@@ -119,7 +119,7 @@ async def search_locations(
 
         return candidates
     except (httpx.HTTPError, KeyError, ValueError) as exc:
-        logger.warning("Geocoding search failed for query '%s': %s", clean_query, exc)
+        logger.warning("Geocoding search request failed: %s", exc)
         return []
 
 
@@ -170,9 +170,7 @@ async def reverse_geocode(latitude: float, longitude: float) -> ReverseGeocodeIt
             longitude=longitude,
         )
     except (httpx.HTTPError, KeyError, ValueError) as exc:
-        logger.warning(
-            "Reverse geocoding failed for (%s, %s): %s", latitude, longitude, exc
-        )
+        logger.warning("Reverse geocoding request failed: %s", exc)
         return ReverseGeocodeItem(
             display_name=f"{latitude:.4f}, {longitude:.4f}",
             city=None,

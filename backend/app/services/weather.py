@@ -157,9 +157,7 @@ async def fetch_weather(
         )
     except (httpx.HTTPError, ValueError, KeyError) as exc:
         logger.warning(
-            "Failed to fetch live weather from Open-Meteo for (%s, %s): %s. Using graceful fallback.",
-            latitude,
-            longitude,
+            "Failed to fetch live weather from Open-Meteo: %s. Using graceful fallback.",
             exc,
         )
         return FALLBACK_WEATHER

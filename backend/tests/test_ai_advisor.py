@@ -435,7 +435,7 @@ async def test_gemini_recommendation_success(
     import httpx
 
     async def mock_handler(request: httpx.Request) -> httpx.Response:
-        assert "generativelanguage.googleapis.com" in str(request.url)
+        assert request.url.host == "generativelanguage.googleapis.com"
         return httpx.Response(
             200,
             json={
@@ -494,7 +494,7 @@ async def test_claude_recommendation_success(
     import httpx
 
     async def mock_handler(request: httpx.Request) -> httpx.Response:
-        assert "api.anthropic.com" in str(request.url)
+        assert request.url.host == "api.anthropic.com"
         return httpx.Response(
             200,
             json={

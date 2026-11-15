@@ -87,6 +87,9 @@ def calculate_eco_metrics(
             f"Invalid transport mode '{transport_mode}'. Expected one of {CANONICAL_TRANSPORT_MODES}"
         )
 
+    co2_saved: float = 0.0
+    calories: int = 0
+
     match transport_mode:
         case "car":
             co2_saved = 0.0
@@ -100,5 +103,7 @@ def calculate_eco_metrics(
         case "walk":
             co2_saved = round(CAR_BASELINE_CO2_PER_KM * distance_km, 2)
             calories = round(WALK_CALORIES_PER_KM * distance_km)
+        case _:
+            raise ValueError(f"Unhandled transport mode '{transport_mode}'")
 
     return EcoMetrics(co2_saved_kg=co2_saved, calories_burned=calories)

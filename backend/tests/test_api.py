@@ -227,7 +227,8 @@ def test_delete_route_cascades_logs(client_with_clean_db: TestClient):
     ]
     assert cascaded_logs == []
 
-    assert client_with_clean_db.delete("/api/routes/99999").status_code == 404
+    delete_missing_res = client_with_clean_db.delete("/api/routes/99999")
+    assert delete_missing_res.status_code == 404
 
 
 def test_get_commutes_returns_logs_and_summary_stats(
