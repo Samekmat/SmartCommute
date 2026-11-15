@@ -19,6 +19,10 @@ updates:
     labels:
       - "ci"
       - "dependencies"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   # Maintain root NPM development dependencies (husky, prettier, commitlint)
   - package-ecosystem: "npm"
@@ -33,6 +37,10 @@ updates:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
+    groups:
+      root-dependencies:
+        patterns:
+          - "*"
 
   # Maintain frontend React/TypeScript application dependencies
   - package-ecosystem: "npm"
@@ -48,6 +56,34 @@ updates:
     labels:
       - "FE"
       - "dependencies"
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      vite-ecosystem:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "vitest"
+          - "@vitest/*"
+      testing:
+        patterns:
+          - "@testing-library/*"
+          - "jsdom"
+      lint-and-types:
+        patterns:
+          - "eslint*"
+          - "@eslint*"
+          - "prettier"
+          - "typescript"
+          - "@typescript-eslint/*"
+    ignore:
+      # Keep tailwindcss on v3 until deliberate migration to v4 (@tailwindcss/postcss) is performed
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
 
   # Maintain backend FastAPI/Python dependencies
   - package-ecosystem: "pip"
@@ -63,3 +99,7 @@ updates:
     labels:
       - "BE"
       - "dependencies"
+    groups:
+      backend-dependencies:
+        patterns:
+          - "*"
