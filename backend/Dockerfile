@@ -62,7 +62,7 @@ EXPOSE 8000
 
 # Container healthcheck using standard library urllib
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python3 -c "import urllib.request, os; urllib.request.urlopen(f'http://localhost:{os.getenv(\"PORT\", 8000)}/health')" || exit 1
+    CMD ["python3", "-c", "import urllib.request, os; urllib.request.urlopen(f'http://localhost:{os.getenv(\"PORT\", 8000)}/health')"]
 
 # Launch ASGI server with dynamic PORT evaluation
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
