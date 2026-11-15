@@ -303,6 +303,58 @@ describe("ApiClient", () => {
     });
   });
 
+  describe("Geocoding API", () => {
+    it("searches locations and returns validated candidates", async () => {
+      const mockLocations = [
+        {
+          name: "Kraków",
+          latitude: 50.0614,
+          longitude: 19.9366,
+          country: "Polska",
+          admin1: "Województwo małopolskie",
+          display_name: "Kraków, Województwo małopolskie, Polska",
+        },
+      ];
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => mockLocations,
+      });
+
+      const res = await client.searchLocations("Krakow");
+      expect(res).toEqual(mockLocations);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "http://localhost:8000/api/geocoding/search?q=Krakow&count=5",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+
+    it("reverse geocodes coordinates to address", async () => {
+      const mockReverse = {
+        display_name: "Rynek Główny, Kraków, Polska",
+        city: "Kraków",
+        latitude: 50.0614,
+        longitude: 19.9366,
+      };
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => mockReverse,
+      });
+
+      const res = await client.reverseGeocode(50.0614, 19.9366);
+      expect(res).toEqual(mockReverse);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "http://localhost:8000/api/geocoding/reverse?latitude=50.0614&longitude=19.9366",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   describe("HTTP & Network Error Handling", () => {
     it("throws ApiClientError with backend message on HTTP 404", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({

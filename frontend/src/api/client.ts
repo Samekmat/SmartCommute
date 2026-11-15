@@ -22,6 +22,10 @@ import {
   CommuteLogCreate,
   CommuteLogCreateSchema,
   CommuteLogSchema,
+  LocationSearchResult,
+  LocationSearchResultSchema,
+  ReverseGeocodeResult,
+  ReverseGeocodeResultSchema,
   Route,
   RouteCreate,
   RouteCreateSchema,
@@ -291,6 +295,54 @@ export function createApiClient(
         body: JSON.stringify(validatedPayload),
       });
       return validateResponse(AIConfigResponseSchema, raw);
+    },
+
+    /**
+     * Search geographic places by text query.
+     *
+     * @param query - Address or place text.
+     * @param count - Max results (default: 5).
+     * @returns List of validated matching locations with coordinates.
+     */
+    async searchLocations(
+      query: string,
+      count: number = 5
+    ): Promise<LocationSearchResult[]> {
+      const params = new URLSearchParams({
+        q: query,
+        count: count.toString(),
+      });
+      const raw = await requestRaw(
+        `/api/geocoding/search?${params.toString()}`,
+        {
+          method: "GET",
+        }
+      );
+      return validateResponse(z.array(LocationSearchResultSchema), raw);
+    },
+
+    /**
+     * Resolve reverse geocoded human-readable address from coordinates.
+     *
+     * @param latitude - WGS84 latitude.
+     * @param longitude - WGS84 longitude.
+     * @returns Validated reverse geocode result.
+     */
+    async reverseGeocode(
+      latitude: number,
+      longitude: number
+    ): Promise<ReverseGeocodeResult> {
+      const params = new URLSearchParams({
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+      });
+      const raw = await requestRaw(
+        `/api/geocoding/reverse?${params.toString()}`,
+        {
+          method: "GET",
+        }
+      );
+      return validateResponse(ReverseGeocodeResultSchema, raw);
     },
   };
 }

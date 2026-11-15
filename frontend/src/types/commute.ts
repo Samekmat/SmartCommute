@@ -208,6 +208,32 @@ export const AIConfigResponseSchema = z.object({
 export type AIConfigResponse = z.infer<typeof AIConfigResponseSchema>;
 
 /**
+ * Geographic search result item returned by backend geocoding service.
+ */
+export const LocationSearchResultSchema = z.object({
+  name: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  country: z.string().nullable().optional(),
+  admin1: z.string().nullable().optional(),
+  display_name: z.string(),
+});
+
+export type LocationSearchResult = z.infer<typeof LocationSearchResultSchema>;
+
+/**
+ * Address details returned from reverse geocoding coordinates.
+ */
+export const ReverseGeocodeResultSchema = z.object({
+  display_name: z.string(),
+  city: z.string().nullable().optional(),
+  latitude: z.number(),
+  longitude: z.number(),
+});
+
+export type ReverseGeocodeResult = z.infer<typeof ReverseGeocodeResultSchema>;
+
+/**
  * Transfer payload pre-filling the Commute Logger from AI Advisor recommendations.
  */
 export interface CommutePrefill {

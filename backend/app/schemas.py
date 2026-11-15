@@ -179,3 +179,31 @@ class AIConfigResponse(BaseModel):
     provider: Literal["gemini", "openai", "claude"]
     saved_to_env: bool
     message: str
+
+
+class LocationSearchResult(BaseModel):
+    """Geographic location candidate resolved from text query."""
+
+    name: str = Field(description="Primary name of city or place")
+    latitude: float = Field(description="WGS84 latitude coordinate")
+    longitude: float = Field(description="WGS84 longitude coordinate")
+    country: str | None = Field(default=None, description="Country name")
+    admin1: str | None = Field(default=None, description="Administrative region/state")
+    display_name: str = Field(description="Formatted human-readable location string")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReverseGeocodeResult(BaseModel):
+    """Location address details resolved from coordinates."""
+
+    display_name: str = Field(
+        description="Full readable address or locality description"
+    )
+    city: str | None = Field(
+        default=None, description="Extracted city or municipality name"
+    )
+    latitude: float = Field(description="WGS84 latitude")
+    longitude: float = Field(description="WGS84 longitude")
+
+    model_config = ConfigDict(from_attributes=True)

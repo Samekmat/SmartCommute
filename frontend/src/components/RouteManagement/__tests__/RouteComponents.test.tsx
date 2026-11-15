@@ -125,4 +125,17 @@ describe("RouteModal Component", () => {
     expect(screen.getByText("Edit Route")).toBeDefined();
     expect(screen.getByDisplayValue("Home to Office")).toBeDefined();
   });
+
+  it("renders geocoding quick buttons in RouteModal", () => {
+    render(<RouteModal isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />);
+
+    const fetchButtons = screen.getAllByRole("button", {
+      name: /Pobierz współrzędne/i,
+    });
+    expect(fetchButtons.length).toBe(2);
+    expect(
+      screen.getByRole("button", { name: /Moja lokalizacja \(GPS\)/i })
+    ).toBeDefined();
+    expect(screen.getByRole("button", { name: /Wykryj adres/i })).toBeDefined();
+  });
 });
